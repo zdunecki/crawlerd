@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+option go_package = "/crawlerdpb";
+
+package crawlerdpb;
+
+message RequestURL {
+  int64 id = 1;
+  string url = 2;
+  int64 interval = 3;
+}
+
+message RequestDeleteURL {
+  int64 id = 1;
+}
+
+message ResponseURL {
+}
+
+service Worker {
+  rpc AddURL(RequestURL) returns (ResponseURL) {}
+  rpc UpdateURL(RequestURL) returns (ResponseURL) {}
+  rpc DeleteURL(RequestDeleteURL) returns (ResponseURL) {}
+}
+
+service Scheduler {
+  rpc AddURL(RequestURL) returns (ResponseURL) {}
+  rpc UpdateURL(RequestURL) returns (ResponseURL) {}
+  rpc DeleteURL(RequestDeleteURL) returns (ResponseURL) {}
+}
+

@@ -1,0 +1,76 @@
+version: '3'
+services:
+  mongo:
+    image: mongo:3.6
+    volumes:
+      - mongo:/data
+    ports:
+      - 28017:27017
+    restart: always
+    networks:
+      - crawlerd
+
+  etcd:
+    image: bitnami/etcd:3
+    volumes:
+      - etcd:/etcd_data
+    ports:
+      - 2479:2379
+    environment:
+#      TODO: auth
+      ALLOW_NONE_AUTHENTICATION: "yes"
+    restart: always
+    networks:
+      - crawlerd
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+    ports:
+      - 9080:8080
+    entrypoint: ./api -mongo-host mongo -scheduler-addr scheduler:9888
+    networks:
+      - crawlerd
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+      - etcd
+    entrypoint: ./scheduler -etcd-host etcd -mongo-host mongo
+    networks:
+      - crawlerd
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+      - etcd
+    entrypoint: ./worker -etcd-host etcd -mongo-host mongo
+    networks:
+      - crawlerd
+
+  worker2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+      - etcd
+    entrypoint: ./worker -etcd-host etcd -mongo-host mongo
+    networks:
+      - crawlerd
+
+volumes:
+  mongo:
+  etcd:
+
+networks:
+  crawlerd:

@@ -1,0 +1,57 @@
+version: '3'
+services:
+  mongo:
+    image: mongo:3.6
+    restart: always
+    networks:
+      - crawlerd-integration-test-worker
+
+  etcd:
+    image: bitnami/etcd:3
+    environment:
+      #TODO: auth
+      ALLOW_NONE_AUTHENTICATION: "yes"
+    restart: always
+    networks:
+      - crawlerd-integration-test-worker
+
+  api:
+    build:
+      context: ../../../
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+    entrypoint: ./api -mongo-host mongo -scheduler-addr scheduler:9888
+    networks:
+      - crawlerd-integration-test-worker
+
+  scheduler:
+    build:
+      context: ../../../
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+      - etcd
+    entrypoint: ./scheduler -etcd-host etcd -mongo-host mongo
+    networks:
+      - crawlerd-integration-test-worker
+
+  tests:
+    build:
+      context: ../../../
+      dockerfile: Dockerfile.test
+    depends_on:
+      - mongo
+      - etcd
+      - api
+      - scheduler
+    entrypoint: go test ./test/integration/worker
+    environment:
+      ETCD_HOST: etcd
+      MONGO_HOST: mongo
+      SCHEDULER_ADDR: scheduler:9888
+    networks:
+      - crawlerd-integration-test-worker
+
+networks:
+  crawlerd-integration-test-worker:
