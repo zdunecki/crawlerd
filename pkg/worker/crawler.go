@@ -254,6 +254,32 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 	}
 }
 
+func (c *crawler) fetchContent(crawl CrawlURL) error {
+	log.Info("trying fetch resource")
+
+	start := time.Now()
+	resp, err := c.httpRequest(crawl.Url)
+	if err != nil {
+		return err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	finish := time.Now()
+
+	if err != nil {
+		log.Error(err)
+		body = nil
+	}
+
+	if _, _, err := c.storage.History().InsertOne(context.Background(), int(crawl.Id), body, finish.Sub(start), start); err != nil {
+		return err
+	}
+
+	log.Info("content added to history")
+
+	return nil
+}
+
 func (c *crawler) httpRequest(endpoint string) (*http.Response, error) {
 	_, err := url.Parse(endpoint)
 	if err != nil {
@@ -279,30 +305,4 @@ func (c *crawler) httpRequest(endpoint string) (*http.Response, error) {
 	}
 
 	return c.httpClient.Do(req)
-}
-
-func (c *crawler) fetchContent(crawl CrawlURL) error {
-	log.Info("trying fetch resource")
-
-	start := time.Now()
-	resp, err := c.httpRequest(crawl.Url)
-	if err != nil {
-		return err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	finish := time.Now()
-
-	if err != nil {
-		log.Error(err)
-		body = nil
-	}
-
-	if _, _, err := c.storage.History().InsertOne(context.Background(), int(crawl.Id), body, finish.Sub(start), start); err != nil {
-		return err
-	}
-
-	log.Info("content added to history")
-
-	return nil
 }

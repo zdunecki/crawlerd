@@ -9,33 +9,33 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type ClientRepository interface {
+type StorageRepository interface {
 	InsertedID(name string) (int, error)
 }
 
-type Client interface {
+type Storage interface {
 	storage.Client
-	ClientRepository
+	StorageRepository
 }
 
-type client struct {
+type mgo struct {
 	seq *mongo.Collection
 
 	urlrepo     storage.RepositoryURL
 	historyrepo storage.RepositoryHistory
 }
 
-func NewClient(db *mongo.Database) Client {
-	mongodb := &client{
-		seq: db.Collection("seq"),
+func NewStorage(db *mongo.Database) Storage {
+	mongodb := &mgo{
+		seq: db.Collection(DefaultCollectionSequenceName),
 	}
-	mongodb.urlrepo = NewURLRepository(db.Collection("urls"), mongodb)
-	mongodb.historyrepo = NewHistoryRepository(db.Collection("histories"))
+	mongodb.urlrepo = NewURLRepository(db.Collection(DefaultCollectionURLName), mongodb)
+	mongodb.historyrepo = NewHistoryRepository(db.Collection(DefaultCollectionHistoryName))
 
 	return mongodb
 }
 
-func (m *client) InsertedID(name string) (int, error) {
+func (m *mgo) InsertedID(name string) (int, error) {
 	var seq objects.Sequence
 
 	updateSeq := m.seq.FindOneAndUpdate(
@@ -71,10 +71,10 @@ func (m *client) InsertedID(name string) (int, error) {
 	return seq.ID + 1, nil
 }
 
-func (m *client) URL() storage.RepositoryURL {
+func (m *mgo) URL() storage.RepositoryURL {
 	return m.urlrepo
 }
 
-func (m *client) History() storage.RepositoryHistory {
+func (m *mgo) History() storage.RepositoryHistory {
 	return m.historyrepo
 }

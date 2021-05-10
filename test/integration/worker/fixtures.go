@@ -28,7 +28,7 @@ func newFixtureStorage() (storage.Client, error) {
 		return nil, err
 	}
 
-	storage := mgostorage.NewClient(client.Database(dbName))
+	storage := mgostorage.NewStorage(client.Database(dbName))
 
 	return storage, nil
 }

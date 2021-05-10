@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	"crawlerd/pkg/storage/objects"
+	"crawlerd/test"
 )
 
 func TestE2ECrawlerd(t *testing.T) {
@@ -21,9 +23,11 @@ func TestE2ECrawlerd(t *testing.T) {
 		apiHost = "api:8080"
 	}
 
+	interval := 10
+
 	data := map[string]interface{}{
 		"url":      "https://httpbin.org/range/1",
-		"interval": 10,
+		"interval": interval,
 	}
 
 	dataB, err := json.Marshal(data)
@@ -38,7 +42,12 @@ func TestE2ECrawlerd(t *testing.T) {
 		}
 	}
 
-	time.Sleep(time.Minute + time.Second * 3)
+	firstRunDontRunInterval := time.Second * time.Duration(interval)
+	wait := time.Minute - firstRunDontRunInterval
+
+	cycles := int(math.Round(wait.Seconds() / float64(interval)))
+
+	time.Sleep(wait)
 
 	{
 		var history []objects.History
@@ -52,8 +61,6 @@ func TestE2ECrawlerd(t *testing.T) {
 			t.Error(err)
 		}
 
-		if len(history) < 6 {
-			t.Error("should be crawled at least 6 times")
-		}
+		test.Diff(t, "should crawl n times", cycles, len(history))
 	}
 }

@@ -1,12 +1,10 @@
 package worker
 
 import (
-	"context"
 	"time"
 
 	"crawlerd/pkg/storage/mgostorage"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -19,7 +17,6 @@ type (
 )
 
 var (
-	DefaultMongoAddr  = "mongodb://localhost:27017"
 	DefaultETCDConfig = clientv3.Config{
 		Endpoints:   []string{"localhost:2379"},
 		DialTimeout: time.Second * 15,
@@ -71,23 +68,16 @@ func WithETCDRegistry(opts ...*EtcdOption) Option {
 
 func WithMongoDBStorage(dbName string, opts ...*options.ClientOptions) Option {
 	return func(w *worker) error {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		var passOpts []*options.ClientOptions
-
-		passOpts = append(passOpts, options.Client().ApplyURI(DefaultMongoAddr))
-		for _, o := range opts {
-			passOpts = append(passOpts, o)
-		}
-
-		client, err := mongo.Connect(ctx, passOpts...)
+		client, err := mgostorage.NewClient(opts...)
 		if err != nil {
 			return err
 		}
 
-		db := client.Database(dbName)
-		w.storage = mgostorage.NewClient(db)
+		if dbName != "" {
+			client.SetDatabaseName(dbName)
+		}
+
+		w.storage = mgostorage.NewStorage(client.DB())
 
 		return nil
 	}

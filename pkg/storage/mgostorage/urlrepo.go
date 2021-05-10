@@ -14,13 +14,13 @@ const (
 )
 
 type urlrepo struct {
-	client ClientRepository
+	client StorageRepository
 	coll   *mongo.Collection
 
 	defaultScroll int
 }
 
-func NewURLRepository(coll *mongo.Collection, client ClientRepository) storage.RepositoryURL {
+func NewURLRepository(coll *mongo.Collection, client StorageRepository) storage.RepositoryURL {
 	return &urlrepo{
 		client:        client,
 		coll:          coll,
@@ -53,7 +53,7 @@ func (u *urlrepo) FindAll(ctx context.Context) ([]objects.URL, error) {
 }
 
 func (u *urlrepo) InsertOne(ctx context.Context, url string, interval int) (bool, int, error) {
-	seq, err := u.client.InsertedID("urls")
+	seq, err := u.client.InsertedID(DefaultCollectionURLName)
 	if err != nil {
 		return false, 0, err
 	}
