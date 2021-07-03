@@ -1,66 +1,79 @@
 package e2e
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"math"
-	"net/http"
-	"os"
+	"context"
 	"testing"
 	"time"
 
-	"crawlerd/pkg/storage/objects"
-	"crawlerd/test"
+	"crawlerd/api/v1"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-func TestE2ECrawlerd(t *testing.T) {
-	var (
-		apiHost = os.Getenv("API_HOST")
-	)
-
-	if apiHost == "" {
-		apiHost = "api:8080"
-	}
-
-	interval := 10
-
-	data := map[string]interface{}{
-		"url":      "https://httpbin.org/range/1",
-		"interval": interval,
-	}
-
-	dataB, err := json.Marshal(data)
+func TestCrawlOneURL(t *testing.T) {
+	setup, done, err := setupClient()
 	if err != nil {
 		t.Error(err)
+		return
+	}
+	defer done()
+	crawldURL := setup.crawld.URL()
+
+	setup.etcdContainer.DefaultAddress()
+	createResp, err := crawldURL.Create(&v1.RequestPostURL{
+		URL:      "https://httpbin.org/range/1",
+		Interval: 15,
+	})
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	{
-		_, err := http.Post(fmt.Sprintf("http://%s/api/urls", apiHost), "application/json", bytes.NewReader(dataB))
-		if err != nil {
-			t.Error(err)
-		}
+	if createResp.ID != 0 {
+		t.Error("invalid expected created id")
+		return
 	}
 
-	firstRunDontRunInterval := time.Second * time.Duration(interval)
-	wait := time.Minute - firstRunDontRunInterval
+	urls, err := crawldURL.All()
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-	cycles := int(math.Round(wait.Seconds() / float64(interval)))
+	if len(urls) != 1 {
+		t.Error("invalid expected urls length")
+		return
+	}
 
-	time.Sleep(wait)
+	etcdCfg := clientv3.Config{
+		Endpoints:   []string{setup.etcdContainer.DefaultAddress()}, // get host from container
+		DialTimeout: time.Second * 15,
+	}
 
-	{
-		var history []objects.History
+	etcd, err := clientv3.New(etcdCfg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-		res, err := http.Get(fmt.Sprintf("http://%s/api/urls/0/history", apiHost))
-		if err != nil {
-			t.Error(err)
-		}
+	workerKv, err := etcd.Get(context.Background(), "worker", clientv3.WithPrefix())
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-		if err := json.NewDecoder(res.Body).Decode(&history); err != nil {
-			t.Error(err)
-		}
+	if len(workerKv.Kvs) != 1 {
+		t.Error("invalid expected running crawl workers length")
+		return
+	}
 
-		test.Diff(t, "should crawl n times", cycles, len(history))
+	runningCrawlUrlsKv, err := etcd.Get(context.Background(), "crawl", clientv3.WithPrefix())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if len(runningCrawlUrlsKv.Kvs) != 1 {
+		t.Error("invalid expected running crawl urls length")
+		return
 	}
 }

@@ -46,10 +46,10 @@ func main() {
 
 	if etcd {
 		if etcdHost == "" {
-			opts = append(opts, scheduler.WithETCDWatcher())
+			opts = append(opts, scheduler.WithWatcher())
 		} else {
-			opts = append(opts, scheduler.WithETCDWatcher(
-				scheduler.NewWatcherOption().ApplyConfig(clientv3.Config{
+			opts = append(opts, scheduler.WithWatcher(
+				scheduler.NewWatcherOption().WithETCD(clientv3.Config{
 					Endpoints:   []string{etcdHost + ":2379"},
 					DialTimeout: time.Second * 15,
 				}),

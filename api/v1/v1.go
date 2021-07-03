@@ -17,16 +17,24 @@ const (
 	IntervalMinValue = 5
 )
 
+type V1URL interface {
+	Create(*RequestPostURL) (*ResponsePostURL, error)
+	Patch(id string, data *RequestPatchURL) (*ResponsePostURL, error)
+	Delete(id string) error
+	All() ([]*objects.URL, error)
+	History(urlID string) ([]*objects.History, error)
+}
+
 type V1 interface {
-	Serve(addr string, v1 api.Api) error
+	URL() V1URL
 }
 
 type v1 struct {
-	storage   storage.Client
+	storage   storage.Storage
 	scheduler crawlerdpb.SchedulerClient
 }
 
-func New(opts ...Option) (V1, error) {
+func New(opts ...Option) (*v1, error) {
 	v := &v1{}
 
 	for _, o := range opts {
@@ -48,7 +56,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 	}
 
 	v1.Post("/api/urls", func(ctx api.Context) {
-		var req RequestPostURL
+		var req *RequestPostURL
 
 		data, err := ioutil.ReadAll(ctx.Request().Body)
 		if data != nil && len(data) >= DefaultMaxPOSTContentLength.Int() {
@@ -222,6 +230,6 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 		ctx.JSON(history)
 	})
 
-	log.Info("server listening on: ", addr)
+	log.Info("api: server listening on: ", addr)
 	return http.ListenAndServe(addr, v1.Handler())
 }

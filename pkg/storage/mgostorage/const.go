@@ -8,7 +8,3 @@ const (
 	DefaultCollectionURLName      = "urls"
 	DefaultCollectionSequenceName = "seq"
 )
-
-const (
-	A = ""
-)

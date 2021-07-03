@@ -5,6 +5,7 @@ import (
 
 	"crawlerd/pkg/storage"
 	"crawlerd/pkg/storage/mgostorage"
+	"crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -13,9 +14,11 @@ type (
 	Option func(*scheduler) error
 
 	WatcherOption struct {
-		config       *clientv3.Config
+		etcdConfig   *clientv3.Config
+		k8sConfig    error // TODO:
 		timerTimeout *time.Duration
-		storage      storage.Client
+		storage      storage.Storage
+		clusterType  worker.ClusterType
 	}
 )
 
@@ -31,35 +34,43 @@ func NewWatcherOption() *WatcherOption {
 	return &WatcherOption{}
 }
 
-func (o *WatcherOption) ApplyConfig(cfg clientv3.Config) *WatcherOption {
-	o.config = &cfg
+func (o *WatcherOption) WithETCD(cfg clientv3.Config) *WatcherOption {
+	o.etcdConfig = &cfg
 
 	return o
 }
 
-func (o *WatcherOption) ApplyTimerTimeout(t time.Duration) *WatcherOption {
+func (o *WatcherOption) WithTimerTimeout(t time.Duration) *WatcherOption {
 	o.timerTimeout = &t
 
 	return o
 }
 
-func (o *WatcherOption) ApplyStorage(s storage.Client) *WatcherOption {
+func (o *WatcherOption) WithStorage(s storage.Storage) *WatcherOption {
 	o.storage = s
 
 	return o
 }
 
-func WithETCDWatcher(opts ...*WatcherOption) Option {
+func WithWatcher(opts ...*WatcherOption) Option {
 	return func(s *scheduler) error {
-		cfg := DefaultETCDConfig
 		timerTimeOut := DefaultTimerTimeout
 		storage := s.storage
+		var workerCluster worker.Cluster
 
-		for _, o := range opts {
-			if o.config != nil {
-				cfg = *o.config
+		setupETCD := func(c clientv3.Config) error {
+			etcd, err := clientv3.New(c)
+			if err != nil {
+				return err
 			}
 
+			workerCluster = worker.NewETCDCluster(etcd)
+			s.leasing = NewLeasing(workerCluster, s.server)
+
+			return nil
+		}
+
+		for _, o := range opts {
 			if o.timerTimeout != nil {
 				timerTimeOut = *o.timerTimeout
 			}
@@ -67,20 +78,35 @@ func WithETCDWatcher(opts ...*WatcherOption) Option {
 			if o.storage != nil {
 				storage = o.storage
 			}
-		}
 
-		etcd, err := clientv3.New(cfg)
-		if err != nil {
-			return err
+			if o.k8sConfig != nil {
+				// TODO: k8s
+			} else if o.etcdConfig != nil {
+				if err := setupETCD(*o.etcdConfig); err != nil {
+					return err
+				}
+			} else {
+				if err := setupETCD(DefaultETCDConfig); err != nil {
+					return err
+				}
+			}
 		}
-
-		s.leasing = NewETCDLeasing(etcd, s.server)
 
 		if storage == nil {
 			return ErrStorageIsRequired
 		}
 
-		s.watcher = NewETCDWatcher(etcd, storage, timerTimeOut)
+		if workerCluster == nil {
+			if err := setupETCD(DefaultETCDConfig); err != nil {
+				return err
+			}
+		}
+
+		if workerCluster == nil {
+			return ErrClusterIsRequired
+		}
+
+		s.watcher = NewWatcher(workerCluster, storage.URL(), timerTimeOut)
 
 		return nil
 	}

@@ -9,20 +9,20 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type StorageRepository interface {
+type MongoStorage interface {
 	InsertedID(name string) (int, error)
 }
 
 type Storage interface {
-	storage.Client
-	StorageRepository
+	storage.Storage
+	MongoStorage
 }
 
 type mgo struct {
 	seq *mongo.Collection
 
-	urlrepo     storage.RepositoryURL
-	historyrepo storage.RepositoryHistory
+	urlrepo     storage.URLRepository
+	historyrepo storage.HistoryRepository
 }
 
 func NewStorage(db *mongo.Database) Storage {
@@ -71,10 +71,15 @@ func (m *mgo) InsertedID(name string) (int, error) {
 	return seq.ID + 1, nil
 }
 
-func (m *mgo) URL() storage.RepositoryURL {
+func (m *mgo) URL() storage.URLRepository {
 	return m.urlrepo
 }
 
-func (m *mgo) History() storage.RepositoryHistory {
+func (m *mgo) History() storage.HistoryRepository {
 	return m.historyrepo
+}
+
+// registry is available in etcdstorage
+func (m *mgo) Registry() storage.RegistryRepository {
+	return nil
 }

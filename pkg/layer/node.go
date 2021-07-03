@@ -17,6 +17,7 @@ const (
 
 const (
 	HTMLAttributeValue = "value"
+	HTMLAttributeName  = "name"
 )
 
 type HTML struct {
@@ -68,6 +69,9 @@ func (h *HTML) Encode() (*HTML, error) {
 			data.Attrs = make(map[string]string)
 
 			for _, attr := range node.Attr {
+				if attr.Key == HTMLAttributeName {
+					data.Name = attr.Val
+				}
 				data.Attrs[attr.Key] = attr.Val
 			}
 

@@ -5,26 +5,28 @@ import (
 	"sync"
 
 	"crawlerd/crawlerdpb"
+	"crawlerd/pkg/storage"
+	"crawlerd/pkg/storage/objects"
 	log "github.com/sirupsen/logrus"
 )
 
 type Controller interface {
-	ReAttachResources(chan CrawlURL)
+	ReAttachResources(chan objects.CrawlURL)
 }
 
 type controller struct {
 	scheduler crawlerdpb.SchedulerClient
-	registry  Registry
+	registry  storage.RegistryRepository
 }
 
-func NewController(scheduler crawlerdpb.SchedulerClient, registry Registry) Controller {
+func NewController(scheduler crawlerdpb.SchedulerClient, registry storage.RegistryRepository) Controller {
 	return &controller{
 		scheduler: scheduler,
 		registry:  registry,
 	}
 }
 
-func (c *controller) ReAttachResources(urlC chan CrawlURL) {
+func (c *controller) ReAttachResources(urlC chan objects.CrawlURL) {
 	log.Infoln("attach jobs to another workers...")
 
 	wg := sync.WaitGroup{}
@@ -38,7 +40,7 @@ func (c *controller) ReAttachResources(urlC chan CrawlURL) {
 
 	i := 0
 	for crawl := range urlC {
-		func(crawl CrawlURL) {
+		func(crawl objects.CrawlURL) {
 			defer func() {
 				wg.Done()
 				i++

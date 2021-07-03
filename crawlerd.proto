@@ -17,6 +17,11 @@ message RequestDeleteURL {
 message ResponseURL {
 }
 
+message TopicMessage {
+  string url = 1;
+  bytes body = 2;
+}
+
 service Worker {
   rpc AddURL(RequestURL) returns (ResponseURL) {}
   rpc UpdateURL(RequestURL) returns (ResponseURL) {}

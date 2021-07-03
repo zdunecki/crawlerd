@@ -5,45 +5,46 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
+	"crawlerd/crawlerdpb"
+	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/storage"
+	"crawlerd/pkg/storage/objects"
 	"crawlerd/pkg/util"
 	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
 	//TODO: configurable chan buf length
 	DefaultQueueLength     = 10000
 	HTTPClientTimeout      = time.Second * 5
-	HeaderContentLengthMax = 256 * util.KB
+	HeaderContentLengthMax = 5 * util.MB
+)
+
+const (
+	pagePubSubTopic = "page"
 )
 
 type (
 	QueueInterval int64
-	CrawlerStopCB func(chan CrawlURL)
-)
-
-type (
-	// TODO: protobuf instead of json
-	CrawlURL struct {
-		Id       int64
-		Url      string
-		Interval int64
-		WorkerID string
-	}
+	CrawlerStopCB func(chan objects.CrawlURL)
 )
 
 type Crawler interface {
-	Enqueue(CrawlURL)
-	Update(CrawlURL)
+	Enqueue(objects.CrawlURL)
+	Update(objects.CrawlURL)
 	Dequeue(int64)
 
 	Stop(CrawlerStopCB)
 
+	newIntervalQue(crawlURL objects.CrawlURL)
 	crawl(*time.Ticker, QueueInterval)
+	fetchContent(crawl objects.CrawlURL) error
 	httpRequest(string) (*http.Response, error)
 }
 
@@ -54,16 +55,28 @@ type crawler struct {
 	httpClient *http.Client
 
 	worker   Worker
-	storage  storage.Client
-	registry Registry
+	history  storage.HistoryRepository
+	registry storage.RegistryRepository
+
+	processor  *processor
+	pageLookup *pageLookup
+	pubsub     pubsub.PubSub
 
 	stopC       map[QueueInterval]chan bool
 	ticker      map[QueueInterval]*time.Ticker
-	queueC      map[QueueInterval]chan CrawlURL
-	closeQueueC chan CrawlURL
+	queueC      map[QueueInterval]chan objects.CrawlURL
+	closeQueueC chan objects.CrawlURL
+
+	log *log.Entry
 }
 
-func NewCrawler(storage storage.Client, registry Registry, worker Worker) Crawler {
+func init() {
+	if os.Getenv("DEBUG") == "1" {
+		log.SetLevel(log.DebugLevel)
+	}
+}
+
+func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub) Crawler {
 	return &crawler{
 		wgStop: &sync.WaitGroup{},
 
@@ -71,30 +84,37 @@ func NewCrawler(storage storage.Client, registry Registry, worker Worker) Crawle
 			Timeout: HTTPClientTimeout,
 		},
 
-		worker:   worker,
-		storage:  storage,
-		registry: registry,
+		worker:     worker,
+		history:    storage.History(),
+		registry:   storage.Registry(),
+		processor:  NewProcessor(),
+		pageLookup: NewPageLookup(),
+		pubsub:     pubsub,
 
 		stopC:       make(map[QueueInterval]chan bool),
 		ticker:      make(map[QueueInterval]*time.Ticker),
-		queueC:      make(map[QueueInterval]chan CrawlURL),
-		closeQueueC: make(chan CrawlURL, DefaultQueueLength),
+		queueC:      make(map[QueueInterval]chan objects.CrawlURL),
+		closeQueueC: make(chan objects.CrawlURL, DefaultQueueLength),
+
+		log: log.WithFields(map[string]interface{}{
+			"service": "crawler",
+		}),
 	}
 }
 
 func (c *crawler) Dequeue(id int64) {
 	if err := c.registry.DeleteURLByID(int(id)); err != nil {
-		log.Error(err)
+		c.log.Error(err)
 	}
 }
 
-func (c *crawler) Update(crawlURL CrawlURL) {
+func (c *crawler) Update(crawlURL objects.CrawlURL) {
 	if err := c.registry.PutURL(crawlURL); err != nil {
-		log.Error(err)
+		c.log.Error(err)
 	}
 }
 
-func (c *crawler) Enqueue(crawlURL CrawlURL) {
+func (c *crawler) Enqueue(crawlURL objects.CrawlURL) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -102,37 +122,22 @@ func (c *crawler) Enqueue(crawlURL CrawlURL) {
 
 	intervalID := QueueInterval(crawlURL.Interval)
 
-	_, exists := c.ticker[intervalID]
+	_, intervalQueExists := c.ticker[intervalID]
 
-	if exists {
+	if intervalQueExists {
 		c.queueC[intervalID] <- crawlURL
 		if err := c.registry.PutURL(crawlURL); err != nil {
 			return
 		}
 
 		if err := c.fetchContent(crawlURL); err != nil {
-			log.Error(err)
+			c.log.Error(err)
 		}
 
 		return
 	}
 
-	ticker := time.NewTicker(time.Second * time.Duration(crawlURL.Interval))
-	c.stopC[intervalID] = make(chan bool)
-	c.ticker[intervalID] = ticker
-	c.queueC[intervalID] = make(chan CrawlURL, DefaultQueueLength)
-	c.queueC[intervalID] <- crawlURL
-
-	if err := c.registry.PutURL(crawlURL); err != nil {
-		return
-	}
-
-	go func(crawlURL CrawlURL) {
-		if err := c.fetchContent(crawlURL); err != nil {
-			log.Error(err)
-		}
-		c.crawl(ticker, QueueInterval(crawlURL.Interval))
-	}(crawlURL)
+	c.newIntervalQue(crawlURL)
 }
 
 func (c *crawler) Stop(cb CrawlerStopCB) {
@@ -149,6 +154,32 @@ func (c *crawler) Stop(cb CrawlerStopCB) {
 
 	c.wgStop.Wait()
 	cb(c.closeQueueC)
+}
+
+func (c *crawler) newIntervalQue(crawlURL objects.CrawlURL) {
+	intervalID := QueueInterval(crawlURL.Interval)
+
+	ticker := time.NewTicker(time.Second * time.Duration(crawlURL.Interval))
+	c.stopC[intervalID] = make(chan bool)
+	c.ticker[intervalID] = ticker
+	c.queueC[intervalID] = make(chan objects.CrawlURL, DefaultQueueLength)
+	c.queueC[intervalID] <- crawlURL
+
+	if err := c.registry.PutURL(objects.CrawlURL{
+		Id:       crawlURL.Id,
+		Url:      crawlURL.Url,
+		Interval: crawlURL.Interval,
+		WorkerID: crawlURL.WorkerID,
+	}); err != nil {
+		return
+	}
+
+	go func(crawlURL objects.CrawlURL) {
+		if err := c.fetchContent(crawlURL); err != nil {
+			c.log.Error(err)
+		}
+		c.crawl(ticker, QueueInterval(crawlURL.Interval))
+	}(crawlURL)
 }
 
 func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
@@ -193,41 +224,41 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 					crawledLen++
 
 					go func() {
-						log.Info("trying fetch resource")
+						c.log.Debug("trying fetch resource")
 						defer wg.Done()
 
 						if err := c.fetchContent(crawlQ); err != nil {
-							log.Error(err)
+							c.log.Error(err)
 						}
 					}()
 
 					reCrawlUrl, err := c.registry.GetURLByID(int(crawlQ.Id))
 					if err != nil {
-						log.Error(err)
+						c.log.Error(err)
 						continue
 					}
 
 					if reCrawlUrl == nil {
-						log.Warn("url is nil")
+						c.log.Warn("url is nil")
 						continue
 					}
 
-					log.Info("try requeue")
+					c.log.Debug("try requeue")
 
 					crawlIsUpdated := cmp.Diff(*reCrawlUrl, crawlQ) != ""
 
 					if !crawlIsUpdated {
 						c.queueC[intervalID] <- *reCrawlUrl
-						log.Info("requeued successfully")
+						c.log.Debug("requeued successfully")
 						continue
 					}
 
 					newInterval := QueueInterval(reCrawlUrl.Interval)
-					log.Info("requeued queue must be updated")
+					c.log.Debug("requeued queue must be updated")
 
 					if newInterval == intervalID {
 						c.queueC[intervalID] <- *reCrawlUrl
-						log.Info("requeued queue updated successfully")
+						c.log.Debug("requeued queue updated successfully")
 						continue
 					}
 
@@ -236,8 +267,8 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 					_, queueExists := c.queueC[newInterval]
 
 					if !queueExists {
-						log.Info("create new channel for queue")
-						c.queueC[newInterval] = make(chan CrawlURL, DefaultQueueLength)
+						c.log.Debug("create new channel for queue")
+						c.queueC[newInterval] = make(chan objects.CrawlURL, DefaultQueueLength)
 
 						newTick := time.NewTicker(time.Second * time.Duration(newInterval))
 						go c.crawl(newTick, newInterval)
@@ -245,7 +276,7 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 
 					c.queueC[newInterval] <- *reCrawlUrl
 					c.mu.Unlock()
-					log.Info("requeued to another QueueInterval successfully")
+					c.log.Debug("requeued to another QueueInterval successfully")
 				}
 			}
 
@@ -254,8 +285,9 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 	}
 }
 
-func (c *crawler) fetchContent(crawl CrawlURL) error {
-	log.Info("trying fetch resource")
+// TODO: find best algorithm for HTML compression
+func (c *crawler) fetchContent(crawl objects.CrawlURL) error {
+	c.log.Debug("trying fetch content")
 
 	start := time.Now()
 	resp, err := c.httpRequest(crawl.Url)
@@ -263,21 +295,55 @@ func (c *crawler) fetchContent(crawl CrawlURL) error {
 		return err
 	}
 
+	createHistory := func(body []byte, finish time.Time) error {
+		l := c.log.WithFields(log.Fields{
+			"id": crawl.Id,
+		})
+		if _, _, err := c.history.InsertOne(context.Background(), int(crawl.Id), body, finish.Sub(start), start); err != nil {
+			return err
+		}
+
+		l.Debug("content added to history")
+		return nil
+	}
+
 	body, err := ioutil.ReadAll(resp.Body)
-	finish := time.Now()
-
 	if err != nil {
-		log.Error(err)
+		c.log.Error(err)
 		body = nil
+		return createHistory(body, time.Now())
 	}
 
-	if _, _, err := c.storage.History().InsertOne(context.Background(), int(crawl.Id), body, finish.Sub(start), start); err != nil {
-		return err
-	}
+	status := c.pageLookup.status(resp, crawl.Url)
 
-	log.Info("content added to history")
+	go func() {
+		c.log.Debugf("page_discovery_status: %s", status)
 
-	return nil
+		switch status {
+		case PageStatusProcess:
+			// TODO: what if body is not html
+			if err := c.processor.processHTML(body); err != nil {
+				c.log.Error(err)
+			}
+
+		case PageStatusStream: // TODO: queue
+			topicMsg := &crawlerdpb.TopicMessage{
+				Url:  crawl.Url,
+				Body: body,
+			}
+			msg, err := proto.Marshal(topicMsg)
+			if err != nil {
+				c.log.Error(err)
+				return
+			}
+
+			if err := c.pubsub.Publish(pagePubSubTopic, msg); err != nil {
+				c.log.Error(err)
+			}
+		}
+	}()
+
+	return createHistory(body, time.Now())
 }
 
 func (c *crawler) httpRequest(endpoint string) (*http.Response, error) {

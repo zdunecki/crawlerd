@@ -7,8 +7,6 @@ import (
 	"net/url"
 
 	"crawlerd/pkg/worker"
-
-	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 type layer struct {
@@ -24,15 +22,17 @@ func NewLayerEngine() *layer {
 }
 
 func (l *layer) Diff(bodyA, bodyB io.Reader) (string, error) {
-	dmp := diffmatchpatch.New()
-
-	b, err := ioutil.ReadFile("./page.json")
+	resp, err := l.httpRequest("https://livesession.io")
 	if err != nil {
-		return "", nil
+		return "", err
 	}
-	diffs := dmp.DiffMain(string(b), string(b), true)
 
-	return dmp.DiffText1(diffs), nil
+	_, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return "", err
 }
 
 func (l *layer) httpRequest(endpoint string) (*http.Response, error) {

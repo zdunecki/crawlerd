@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/scheduler"
+	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/storage"
 	"crawlerd/pkg/util"
 
@@ -35,18 +35,22 @@ type worker struct {
 	addr          string
 	schedulerAddr string
 
-	storage  storage.Client
-	registry Registry
-	crawler  Crawler
-	ctrl     Controller
+	storage storage.Storage
+	crawler Crawler
+	ctrl    Controller
+	pubsub  pubsub.PubSub
 
 	grpcserver *grpc.Server
 	listener   net.Listener
+
+	cluster Cluster
+
+	log *log.Entry
 }
 
 func New(opts ...Option) (Worker, error) {
 	worker := &worker{
-		schedulerAddr: scheduler.DefaultSchedulerGRPCServerAddr,
+		schedulerAddr: ":9888",
 	}
 
 	for _, o := range opts {
@@ -59,8 +63,16 @@ func New(opts ...Option) (Worker, error) {
 		return nil, ErrStorageIsRequired
 	}
 
-	if worker.registry == nil {
+	if worker.storage.Registry() == nil {
 		return nil, ErrRegistryIsRequired
+	}
+
+	if worker.pubsub == nil {
+		return nil, ErrPubSubIsRequired
+	}
+
+	if worker.cluster == nil {
+		return nil, ErrWorkerIsRequired
 	}
 
 	{
@@ -72,33 +84,35 @@ func New(opts ...Option) (Worker, error) {
 		worker.id = id
 		worker.addr = addr
 
-		worker.crawler = NewCrawler(worker.storage, worker.registry, worker)
+		worker.crawler = NewCrawler(worker.storage, worker, worker.pubsub)
 
 		grpcsrv, schedulercli, lis, err := worker.newGRPC()
 		if err != nil {
 			return nil, err
 		}
 
-		worker.ctrl = NewController(schedulercli, worker.registry)
+		worker.ctrl = NewController(schedulercli, worker.storage.Registry())
 
 		worker.grpcserver = grpcsrv
 		worker.listener = lis
-
-		worker.registry.WithWorker(worker)
 	}
+
+	worker.log = log.WithFields(map[string]interface{}{
+		"service": "worker",
+	})
 
 	return worker, nil
 }
 
-func (c *worker) ID() string {
-	return c.id
+func (w *worker) ID() string {
+	return w.id
 }
 
-func (c *worker) Addr() string {
-	return c.addr
+func (w *worker) Addr() string {
+	return w.addr
 }
 
-func (c *worker) Serve(ctx context.Context) error {
+func (w *worker) Serve(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -116,23 +130,24 @@ func (c *worker) Serve(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				c.listener.Close()
+				w.listener.Close()
 			}
 		}
 	}()
 
 	return backoff.Retry(func() error {
 		ctx := ctx
-		if err := c.registry.RegisterWorker(); err != nil {
+
+		if err := w.cluster.Register(context.Background(), w); err != nil {
 			return err
 		}
 
 		once.Do(func() {
-			go c.gracefulShutdown() // TODO: return channel
+			go w.gracefulShutdown() // TODO: return channel
 		})
 
-		log.Info("listening on: ", c.listener.Addr())
-		err := c.grpcserver.Serve(c.listener)
+		w.log.Info("listening on: ", w.listener.Addr())
+		err := w.grpcserver.Serve(w.listener)
 
 		if err != nil && ctx.Err() != context.Canceled {
 			return err
@@ -142,7 +157,7 @@ func (c *worker) Serve(ctx context.Context) error {
 	}, bo)
 }
 
-func (c *worker) gracefulShutdown() {
+func (w *worker) gracefulShutdown() {
 	sigint := make(chan os.Signal, 1)
 
 	signal.Notify(sigint, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -150,23 +165,24 @@ func (c *worker) gracefulShutdown() {
 	<-sigint
 
 	{
-		if err := c.registry.UnregisterWorker(); err != nil {
-			log.Error(err)
+
+		if err := w.cluster.Register(context.Background(), w); err != nil {
+			w.log.Error(err)
 			return
 		}
 
-		c.crawler.Stop(c.ctrl.ReAttachResources)
+		w.crawler.Stop(w.ctrl.ReAttachResources)
 	}
 
 	os.Exit(0)
 }
 
-func (c *worker) addrGen() (workerID, workerAddr string, err error) {
+func (w *worker) addrGen() (workerID, workerAddr string, err error) {
 	workerID = util.RandomString(10)
 	// TODO: attach another port if already exists
 	workerPort := strconv.Itoa(util.Between(9111, 9555))
 	workerHost, err := os.Hostname()
-	hostEnv := os.Getenv("HOST")
+	hostEnv := os.Getenv("WORKER_HOST")
 	if hostEnv != "" {
 		workerHost = hostEnv
 	} else {
@@ -180,16 +196,16 @@ func (c *worker) addrGen() (workerID, workerAddr string, err error) {
 	return workerID, workerAddr, nil
 }
 
-func (c *worker) newGRPC() (*grpc.Server, crawlerdpb.SchedulerClient, net.Listener, error) {
-	if c.addr == "" {
+func (w *worker) newGRPC() (*grpc.Server, crawlerdpb.SchedulerClient, net.Listener, error) {
+	if w.addr == "" {
 		return nil, nil, nil, ErrEmptySchedulerGRPCSrvAddr
 	}
-	lis, err := net.Listen("tcp", c.addr)
+	lis, err := net.Listen("tcp", w.addr)
 	grpcsrv := grpc.NewServer()
 
-	crawlerdpb.RegisterWorkerServer(grpcsrv, NewServer(c.crawler))
+	crawlerdpb.RegisterWorkerServer(grpcsrv, NewServer(w.crawler))
 
-	schedulerconn, err := grpc.Dial(c.schedulerAddr, grpc.WithInsecure())
+	schedulerconn, err := grpc.Dial(w.schedulerAddr, grpc.WithInsecure())
 	if err != nil {
 		return nil, nil, nil, err
 	}

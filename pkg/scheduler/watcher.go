@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -10,9 +9,8 @@ import (
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/storage"
 	"crawlerd/pkg/storage/objects"
+	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"
-	"go.etcd.io/etcd/api/v3/mvccpb"
-	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type (
@@ -31,24 +29,24 @@ type Watcher interface {
 	ResetTimer()
 }
 
-type etcdwatcher struct {
-	etcd    *clientv3.Client
-	storage storage.Client
+type watcher struct {
+	workerCluster worker.Cluster
+	url           storage.URLRepository
 
 	urlTimerTimeout time.Duration
 	urlTimer        *time.Timer
 }
 
-func NewETCDWatcher(etcd *clientv3.Client, storage storage.Client, timerTimeout time.Duration) Watcher {
-	return &etcdwatcher{
-		etcd:            etcd,
-		storage:         storage,
+func NewWatcher(workerCluster worker.Cluster, url storage.URLRepository, timerTimeout time.Duration) Watcher {
+	return &watcher{
+		workerCluster:   workerCluster,
+		url:             url,
 		urlTimerTimeout: timerTimeout,
 		urlTimer:        time.NewTimer(timerTimeout),
 	}
 }
 
-func (w *etcdwatcher) WatchWorkers(f func(WorkerWatcherEvent)) {
+func (w *watcher) WatchWorkers(f func(WorkerWatcherEvent)) {
 	go func() {
 		tick := time.NewTicker(time.Minute)
 
@@ -62,20 +60,17 @@ func (w *etcdwatcher) WatchWorkers(f func(WorkerWatcherEvent)) {
 		}
 	}()
 
-	for {
-		watchWorkers := <-w.etcd.Watch(context.Background(), "worker.", clientv3.WithPrefix())
-		for _, ev := range watchWorkers.Events {
-			switch ev.Type {
-			case mvccpb.DELETE:
-				f(WorkerWatcherEventDelete)
-			case mvccpb.PUT:
-				f(WorkerWatcherEventPut)
-			}
+	w.workerCluster.Watch(func(event worker.EventType) {
+		switch event {
+		case worker.DELETE:
+			f(WorkerWatcherEventDelete)
+		case worker.PUT:
+			f(WorkerWatcherEventPut)
 		}
-	}
+	})
 }
 
-func (w etcdwatcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
+func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 	justNow := time.NewTimer(time.Second)
 
 	wg := sync.WaitGroup{}
@@ -90,20 +85,21 @@ func (w etcdwatcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 			wg.Add(1)
 		}
 
-		if err := w.storage.URL().Scroll(context.Background(), func(urls []objects.URL) {
+		if err := w.url.Scroll(context.Background(), func(urls []objects.URL) {
 			for _, url := range urls {
 				go func(url objects.URL) {
-					resp, err := w.etcd.Get(context.Background(), fmt.Sprintf("crawl.%s", strconv.Itoa(url.ID)))
+					err := w.workerCluster.DeleteByID(context.Background(), strconv.Itoa(url.ID))
 					if err != nil {
 						log.Error(err)
 						return
 					}
 
-					isCrawling := resp.Kvs != nil && len(resp.Kvs) > 0
-
-					if isCrawling {
-						return
-					}
+					// TODO: check
+					//isCrawling := resp.Kvs != nil && len(resp.Kvs) > 0
+					//
+					//if isCrawling {
+					//	return
+					//}
 
 					f(&crawlerdpb.RequestURL{
 						Id:       int64(url.ID),
@@ -129,6 +125,6 @@ func (w etcdwatcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 	}
 }
 
-func (w *etcdwatcher) ResetTimer() {
+func (w *watcher) ResetTimer() {
 	w.urlTimer.Reset(w.urlTimerTimeout)
 }

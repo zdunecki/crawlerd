@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -25,10 +26,18 @@ type Scheduler interface {
 }
 
 type scheduler struct {
-	storage storage.Client
+	storage storage.Storage
 	watcher Watcher
 	leasing Leasing
 	server  Server
+
+	log *log.Entry
+}
+
+func init() {
+	if os.Getenv("DEBUG") == "1" {
+		log.SetLevel(log.DebugLevel)
+	}
 }
 
 func New(opts ...Option) (Scheduler, error) {
@@ -56,6 +65,10 @@ func New(opts ...Option) (Scheduler, error) {
 		return nil, ErrLeasingIsRequired
 	}
 
+	s.log = log.WithFields(map[string]interface{}{
+		"service": "scheduler",
+	})
+
 	return s, nil
 }
 
@@ -69,15 +82,19 @@ func (s *scheduler) Serve(addr string) error {
 	once := &sync.Once{}
 
 	return backoff.Retry(func() error {
+		s.log.Debug("lease")
 		if err := s.leasing.Lease(); err != nil && err != ErrNoWorkers {
+			s.log.Debug("lease err: " + err.Error())
 			return err
 		}
 
 		lis, err := net.Listen("tcp", addr)
 		if err != nil {
+			s.log.Debug("listen err: " + err.Error())
 			return err
 		}
 		grpcsrv := grpc.NewServer()
+		s.log.Info("register grpc server")
 		crawlerdpb.RegisterSchedulerServer(grpcsrv, s.server)
 
 		once.Do(func() {
@@ -85,7 +102,7 @@ func (s *scheduler) Serve(addr string) error {
 			go s.watchNewURLs()
 		})
 
-		log.Info("listening on: ", lis.Addr())
+		s.log.Info("listening on: ", lis.Addr())
 		if err := grpcsrv.Serve(lis); err != nil {
 			return err
 		}
@@ -99,7 +116,7 @@ func (s *scheduler) watchWorkers() {
 		switch ev {
 		case WorkerWatcherEventDelete, WorkerWatcherEventPut, WorkerWatcherEventTicker:
 			if err := s.leasing.Lease(); err != nil && err != ErrNoWorkers {
-				log.Error(err)
+				s.log.Error(err)
 				return
 			}
 
@@ -113,7 +130,7 @@ func (s *scheduler) watchWorkers() {
 func (s *scheduler) watchNewURLs() {
 	s.watcher.WatchNewURLs(func(url *crawlerdpb.RequestURL) {
 		if _, err := s.server.AddURL(context.Background(), url); err != nil {
-			log.Error(err)
+			s.log.Error(err)
 		}
 	})
 }

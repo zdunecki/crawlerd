@@ -6,15 +6,15 @@ import (
 
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/roundrobin"
+	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 )
 
 type leasing struct {
-	etcd *clientv3.Client
-	srv  Server
+	workerCluster worker.Cluster
+	srv           Server
 }
 
 type Leasing interface {
@@ -23,30 +23,32 @@ type Leasing interface {
 	newBackoff(fn func() error) error
 }
 
-func NewETCDLeasing(etcd *clientv3.Client, srv Server) Leasing {
-	return &leasing{etcd: etcd, srv: srv}
+func NewLeasing(workerCluster worker.Cluster, srv Server) Leasing {
+	return &leasing{workerCluster: workerCluster, srv: srv}
 }
 
 func (l *leasing) Lease() error {
 	return l.newBackoff(func() error {
-		resp, err := l.etcd.Get(context.Background(), "worker.", clientv3.WithPrefix())
+		workers, err := l.workerCluster.GetAll(context.Background())
 		if err != nil {
 			return err
 		}
 
-		if resp.Kvs == nil || len(resp.Kvs) == 0 {
+		if workers == nil || len(workers) == 0 {
 			l.srv.PutWorkerGen(nil)
 			return ErrNoWorkers
 		}
 
-		workers := make([]interface{}, len(resp.Kvs))
-		for i, kv := range resp.Kvs {
+		workerClients := make([]interface{}, len(workers))
+
+		for i, w := range workers {
 			var grpcconn *grpc.ClientConn
 
 			err := l.newBackoff(func() error {
 				ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
 				//TODO: insecure
-				conn, err := grpc.DialContext(ctx, string(kv.Value), grpc.WithInsecure(), grpc.WithBlock())
+
+				conn, err := grpc.DialContext(ctx, w.Addr, grpc.WithInsecure(), grpc.WithBlock())
 				if err != nil {
 					return err
 				}
@@ -55,19 +57,19 @@ func (l *leasing) Lease() error {
 			})
 
 			if err != nil {
-				workerKey := string(kv.Key)
-				log.Warn("delete worker: ", workerKey)
-				if _, err := l.etcd.Delete(context.Background(), workerKey); err != nil {
+				workerID := w.ID
+				log.Warn("delete worker: ", workerID)
+				if err := l.workerCluster.DeleteByID(context.Background(), workerID); err != nil {
 					return err
 				}
 
 				return err
 			}
 
-			workers[i] = crawlerdpb.NewWorkerClient(grpcconn)
+			workerClients[i] = crawlerdpb.NewWorkerClient(grpcconn)
 		}
 
-		robinGen := roundrobin.New(workers)
+		robinGen := roundrobin.New(workerClients)
 
 		l.srv.PutWorkerGen(robinGen)
 

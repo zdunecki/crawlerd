@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"crawlerd/crawlerdpb"
+	"crawlerd/pkg/storage/objects"
 )
 
 type server struct {
@@ -15,7 +16,7 @@ func NewServer(crawler Crawler) crawlerdpb.WorkerServer {
 }
 
 func (s *server) AddURL(ctx context.Context, req *crawlerdpb.RequestURL) (*crawlerdpb.ResponseURL, error) {
-	s.crawler.Enqueue(CrawlURL{
+	s.crawler.Enqueue(objects.CrawlURL{
 		Id:       req.Id,
 		Url:      req.Url,
 		Interval: req.Interval,
@@ -25,7 +26,7 @@ func (s *server) AddURL(ctx context.Context, req *crawlerdpb.RequestURL) (*crawl
 }
 
 func (s *server) UpdateURL(ctx context.Context, req *crawlerdpb.RequestURL) (*crawlerdpb.ResponseURL, error) {
-	s.crawler.Update(CrawlURL{
+	s.crawler.Update(objects.CrawlURL{
 		Id:       req.Id,
 		Url:      req.Url,
 		Interval: req.Interval,

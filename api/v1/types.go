@@ -18,7 +18,6 @@ type (
 	}
 )
 
-
 type (
 	ResponsePostURL struct {
 		ID int `json:"id"`

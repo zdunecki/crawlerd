@@ -14,7 +14,7 @@ type historyrepo struct {
 	coll *mongo.Collection
 }
 
-func NewHistoryRepository(coll *mongo.Collection) storage.RepositoryHistory {
+func NewHistoryRepository(coll *mongo.Collection) storage.HistoryRepository {
 	return &historyrepo{
 		coll: coll,
 	}

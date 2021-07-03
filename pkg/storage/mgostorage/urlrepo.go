@@ -14,18 +14,22 @@ const (
 )
 
 type urlrepo struct {
-	client StorageRepository
+	client Storage
 	coll   *mongo.Collection
 
 	defaultScroll int
 }
 
-func NewURLRepository(coll *mongo.Collection, client StorageRepository) storage.RepositoryURL {
+func NewURLRepository(coll *mongo.Collection, client Storage) storage.URLRepository {
 	return &urlrepo{
 		client:        client,
 		coll:          coll,
 		defaultScroll: ScrollDefault,
 	}
+}
+
+func (u *urlrepo) FindOne(ctx context.Context) (objects.URL, error) {
+	panic("implement me")
 }
 
 func (u *urlrepo) FindAll(ctx context.Context) ([]objects.URL, error) {
@@ -50,6 +54,10 @@ func (u *urlrepo) FindAll(ctx context.Context) ([]objects.URL, error) {
 	}
 
 	return urls, nil
+}
+
+func (u *urlrepo) FindAllByWorkerID(ctx context.Context) ([]objects.URL, error) {
+	panic("implement me")
 }
 
 func (u *urlrepo) InsertOne(ctx context.Context, url string, interval int) (bool, int, error) {
