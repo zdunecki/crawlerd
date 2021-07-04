@@ -8,14 +8,20 @@ import (
 	"crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"k8s.io/client-go/kubernetes"
 )
+
+type k8sConfig struct {
+	client    kubernetes.Interface
+	namespace string
+}
 
 type (
 	Option func(*scheduler) error
 
 	WatcherOption struct {
 		etcdConfig   *clientv3.Config
-		k8sConfig    error // TODO:
+		k8sConfig    *k8sConfig
 		timerTimeout *time.Duration
 		storage      storage.Storage
 		clusterType  worker.ClusterType
@@ -40,6 +46,15 @@ func (o *WatcherOption) WithETCD(cfg clientv3.Config) *WatcherOption {
 	return o
 }
 
+func (o *WatcherOption) WithK8s(client kubernetes.Interface, namespace string) *WatcherOption {
+	o.k8sConfig = &k8sConfig{
+		client:    client,
+		namespace: namespace,
+	}
+
+	return o
+}
+
 func (o *WatcherOption) WithTimerTimeout(t time.Duration) *WatcherOption {
 	o.timerTimeout = &t
 
@@ -58,7 +73,7 @@ func WithWatcher(opts ...*WatcherOption) Option {
 		storage := s.storage
 		var workerCluster worker.Cluster
 
-		setupETCD := func(c clientv3.Config) error {
+		etcdLeasing := func(c clientv3.Config) error {
 			etcd, err := clientv3.New(c)
 			if err != nil {
 				return err
@@ -80,13 +95,12 @@ func WithWatcher(opts ...*WatcherOption) Option {
 			}
 
 			if o.k8sConfig != nil {
-				// TODO: k8s
+				s.log.Debug("use k8s leasing")
+				workerCluster = worker.NewK8sCluster(o.k8sConfig.client, o.k8sConfig.namespace, s.clusterConfig)
+				s.leasing = NewLeasing(workerCluster, s.server)
 			} else if o.etcdConfig != nil {
-				if err := setupETCD(*o.etcdConfig); err != nil {
-					return err
-				}
-			} else {
-				if err := setupETCD(DefaultETCDConfig); err != nil {
+				s.log.Debug("use etcd leasing")
+				if err := etcdLeasing(*o.etcdConfig); err != nil {
 					return err
 				}
 			}
@@ -97,7 +111,8 @@ func WithWatcher(opts ...*WatcherOption) Option {
 		}
 
 		if workerCluster == nil {
-			if err := setupETCD(DefaultETCDConfig); err != nil {
+			s.log.Debug("use default etcd leasing")
+			if err := etcdLeasing(DefaultETCDConfig); err != nil {
 				return err
 			}
 		}
@@ -124,6 +139,14 @@ func WithMongoDBStorage(dbName string, opts ...*options.ClientOptions) Option {
 		}
 
 		s.storage = mgostorage.NewStorage(client.DB())
+
+		return nil
+	}
+}
+
+func WithWorkerClusterConfig(cfg *worker.Config) Option {
+	return func(s *scheduler) error {
+		s.clusterConfig = cfg
 
 		return nil
 	}

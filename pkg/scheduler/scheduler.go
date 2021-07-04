@@ -9,6 +9,7 @@ import (
 
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/storage"
+	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -26,25 +27,33 @@ type Scheduler interface {
 }
 
 type scheduler struct {
-	storage storage.Storage
-	watcher Watcher
-	leasing Leasing
-	server  Server
+	storage       storage.Storage
+	watcher       Watcher
+	leasing       Leasing
+	server        Server
+	clusterConfig *worker.Config
 
 	log *log.Entry
 }
 
-func init() {
-	if os.Getenv("DEBUG") == "1" {
-		log.SetLevel(log.DebugLevel)
-	}
-}
+//func init() {
+//	if os.Getenv("DEBUG") == "1" { /
+//		log.SetLevel(log.DebugLevel)
+//	}
+//}
 
 func New(opts ...Option) (Scheduler, error) {
+	if os.Getenv("DEBUG") == "1" { // TODO: find better place but init is not the best because it runs before tests and we can't set DEBUG=1 programmatically during tests
+		log.SetLevel(log.DebugLevel)
+	}
+
 	srv := NewServer()
 
 	s := &scheduler{
 		server: srv,
+		log: log.WithFields(map[string]interface{}{
+			"service": "scheduler",
+		}),
 	}
 
 	for _, o := range opts {
@@ -64,10 +73,6 @@ func New(opts ...Option) (Scheduler, error) {
 	if s.leasing == nil {
 		return nil, ErrLeasingIsRequired
 	}
-
-	s.log = log.WithFields(map[string]interface{}{
-		"service": "scheduler",
-	})
 
 	return s, nil
 }

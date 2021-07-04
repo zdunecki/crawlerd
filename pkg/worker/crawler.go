@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"sync"
 	"time"
 
@@ -70,12 +69,6 @@ type crawler struct {
 	log *log.Entry
 }
 
-func init() {
-	if os.Getenv("DEBUG") == "1" {
-		log.SetLevel(log.DebugLevel)
-	}
-}
-
 func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub) Crawler {
 	return &crawler{
 		wgStop: &sync.WaitGroup{},
@@ -103,13 +96,13 @@ func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub) Cr
 }
 
 func (c *crawler) Dequeue(id int64) {
-	if err := c.registry.DeleteURLByID(int(id)); err != nil {
+	if err := c.registry.DeleteURLByID(context.Background(), int(id)); err != nil {
 		c.log.Error(err)
 	}
 }
 
 func (c *crawler) Update(crawlURL objects.CrawlURL) {
-	if err := c.registry.PutURL(crawlURL); err != nil {
+	if err := c.registry.PutURL(context.Background(), crawlURL); err != nil {
 		c.log.Error(err)
 	}
 }
@@ -126,7 +119,7 @@ func (c *crawler) Enqueue(crawlURL objects.CrawlURL) {
 
 	if intervalQueExists {
 		c.queueC[intervalID] <- crawlURL
-		if err := c.registry.PutURL(crawlURL); err != nil {
+		if err := c.registry.PutURL(context.Background(), crawlURL); err != nil {
 			return
 		}
 
@@ -165,7 +158,7 @@ func (c *crawler) newIntervalQue(crawlURL objects.CrawlURL) {
 	c.queueC[intervalID] = make(chan objects.CrawlURL, DefaultQueueLength)
 	c.queueC[intervalID] <- crawlURL
 
-	if err := c.registry.PutURL(objects.CrawlURL{
+	if err := c.registry.PutURL(context.Background(), objects.CrawlURL{
 		Id:       crawlURL.Id,
 		Url:      crawlURL.Url,
 		Interval: crawlURL.Interval,
@@ -232,7 +225,7 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 						}
 					}()
 
-					reCrawlUrl, err := c.registry.GetURLByID(int(crawlQ.Id))
+					reCrawlUrl, err := c.registry.GetURLByID(context.Background(), int(crawlQ.Id))
 					if err != nil {
 						c.log.Error(err)
 						continue

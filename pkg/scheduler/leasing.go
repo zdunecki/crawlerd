@@ -15,6 +15,8 @@ import (
 type leasing struct {
 	workerCluster worker.Cluster
 	srv           Server
+
+	log *log.Entry
 }
 
 type Leasing interface {
@@ -24,10 +26,20 @@ type Leasing interface {
 }
 
 func NewLeasing(workerCluster worker.Cluster, srv Server) Leasing {
-	return &leasing{workerCluster: workerCluster, srv: srv}
+	return &leasing{
+		workerCluster: workerCluster,
+		srv:           srv,
+
+		log: log.WithFields(map[string]interface{}{
+			"cluster_type": workerCluster.Type(),
+			"service":      "leasing",
+		}),
+	}
 }
 
 func (l *leasing) Lease() error {
+	l.log.Debug("try lease workers")
+
 	return l.newBackoff(func() error {
 		workers, err := l.workerCluster.GetAll(context.Background())
 		if err != nil {
@@ -58,7 +70,7 @@ func (l *leasing) Lease() error {
 
 			if err != nil {
 				workerID := w.ID
-				log.Warn("delete worker: ", workerID)
+				l.log.Warn("delete worker: ", workerID)
 				if err := l.workerCluster.DeleteByID(context.Background(), workerID); err != nil {
 					return err
 				}

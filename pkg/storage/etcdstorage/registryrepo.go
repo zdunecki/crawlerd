@@ -23,8 +23,8 @@ func NewRegistryRepository(etcd *clientv3.Client) storage.RegistryRepository {
 	}
 }
 
-func (r *registry) GetURLByID(id int) (*objects.CrawlURL, error) {
-	resp, err := r.etcd.Get(context.Background(), r.crawlID(id))
+func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, error) {
+	resp, err := r.etcd.Get(ctx, r.crawlID(id))
 	if err != nil {
 		return nil, err
 	}
@@ -44,21 +44,21 @@ func (r *registry) GetURLByID(id int) (*objects.CrawlURL, error) {
 	return crawlURL, nil
 }
 
-func (r *registry) PutURL(url objects.CrawlURL) error {
+func (r *registry) PutURL(ctx context.Context, url objects.CrawlURL) error {
 	crawlUrlB, err := json.Marshal(url)
 	if err != nil {
 		return nil
 	}
 
-	if _, err := r.etcd.Put(context.Background(), r.crawlID(int(url.Id)), string(crawlUrlB)); err != nil {
+	if _, err := r.etcd.Put(ctx, r.crawlID(int(url.Id)), string(crawlUrlB)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *registry) DeleteURL(url objects.CrawlURL) error {
-	if _, err := r.etcd.Delete(context.Background(), r.crawlID(int(url.Id))); err != nil {
+func (r *registry) DeleteURL(ctx context.Context, url objects.CrawlURL) error {
+	if _, err := r.etcd.Delete(ctx, r.crawlID(int(url.Id))); err != nil {
 		return err
 	}
 
@@ -66,10 +66,10 @@ func (r *registry) DeleteURL(url objects.CrawlURL) error {
 }
 
 //TODO: scroll
-func (r *registry) FindURLByWorkerID(id string) ([]objects.CrawlURL, error) {
+func (r *registry) FindURLByWorkerID(ctx context.Context, id string) ([]objects.CrawlURL, error) {
 	var result []objects.CrawlURL
 
-	if resp, err := r.etcd.Get(context.Background(), PrefixKeyCrawlURL, clientv3.WithPrefix()); err != nil {
+	if resp, err := r.etcd.Get(ctx, PrefixKeyCrawlURL, clientv3.WithPrefix()); err != nil {
 		return nil, err
 	} else {
 		exists := resp.Kvs != nil && len(resp.Kvs) > 0
@@ -89,7 +89,7 @@ func (r *registry) FindURLByWorkerID(id string) ([]objects.CrawlURL, error) {
 				continue
 			}
 
-			if _, err := r.etcd.Delete(context.Background(), string(kv.Key)); err != nil {
+			if _, err := r.etcd.Delete(ctx, string(kv.Key)); err != nil {
 				return nil, err
 			}
 
@@ -100,8 +100,8 @@ func (r *registry) FindURLByWorkerID(id string) ([]objects.CrawlURL, error) {
 	return result, nil
 }
 
-func (r *registry) DeleteURLByID(id int) error {
-	if _, err := r.etcd.Delete(context.Background(), r.crawlID(id)); err != nil {
+func (r *registry) DeleteURLByID(ctx context.Context, id int) error {
+	if _, err := r.etcd.Delete(ctx, r.crawlID(id)); err != nil {
 		return err
 	}
 

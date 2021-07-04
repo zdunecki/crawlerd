@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"strconv"
 	"sync"
 	"time"
 
@@ -32,6 +31,7 @@ type Watcher interface {
 type watcher struct {
 	workerCluster worker.Cluster
 	url           storage.URLRepository
+	registry      storage.RegistryRepository
 
 	urlTimerTimeout time.Duration
 	urlTimer        *time.Timer
@@ -60,16 +60,19 @@ func (w *watcher) WatchWorkers(f func(WorkerWatcherEvent)) {
 		}
 	}()
 
-	w.workerCluster.Watch(func(event worker.EventType) {
+	if err := w.workerCluster.Watch(func(event worker.EventType) {
 		switch event {
 		case worker.DELETE:
 			f(WorkerWatcherEventDelete)
 		case worker.PUT:
 			f(WorkerWatcherEventPut)
 		}
-	})
+	}); err != nil {
+		// TODO: log, backoff
+	}
 }
 
+// TODO: tests
 func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 	justNow := time.NewTimer(time.Second)
 
@@ -88,18 +91,18 @@ func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 		if err := w.url.Scroll(context.Background(), func(urls []objects.URL) {
 			for _, url := range urls {
 				go func(url objects.URL) {
-					err := w.workerCluster.DeleteByID(context.Background(), strconv.Itoa(url.ID))
+					resp, err := w.registry.GetURLByID(context.Background(), url.ID)
+
 					if err != nil {
 						log.Error(err)
 						return
 					}
 
-					// TODO: check
-					//isCrawling := resp.Kvs != nil && len(resp.Kvs) > 0
-					//
-					//if isCrawling {
-					//	return
-					//}
+					isCrawling := resp != nil
+
+					if isCrawling {
+						return
+					}
 
 					f(&crawlerdpb.RequestURL{
 						Id:       int64(url.ID),

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"crawlerd/pkg/pubsub"
+	storageopt "crawlerd/pkg/storage/options"
 	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -39,24 +40,35 @@ func main() {
 			opts = append(opts, worker.WithETCDCluster())
 		} else {
 			opts = append(opts, worker.WithETCDCluster(
-				worker.NewETCDOption().ApplyConfig(clientv3.Config{
+				clientv3.Config{
 					Endpoints:   []string{etcdHost + ":2379"},
 					DialTimeout: time.Second * 15,
-				}),
+				},
 			))
 		}
 	}
 
 	if mongo {
 		if mongoHost == "" {
-			opts = append(opts, worker.WithMongoDBStorage(dbName))
+			opts = append(opts, worker.WithStorage(
+				storageopt.Client().
+					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", "localhost"))).URL().History(),
+				storageopt.Client().
+					WithETCD(clientv3.Config{
+						Endpoints:   []string{etcdHost + ":2379"},
+						DialTimeout: time.Second * 15,
+					}).Registry(),
+			))
 		} else {
-			opts = append(
-				opts,
-				worker.WithMongoDBStorage(dbName, options.Client().ApplyURI(
-					fmt.Sprintf("mongodb://%s:27017", mongoHost),
-				)),
-			)
+			opts = append(opts, worker.WithStorage(
+				storageopt.Client().
+					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", mongoHost))).URL().History(),
+				storageopt.Client().
+					WithETCD(clientv3.Config{
+						Endpoints:   []string{etcdHost + ":2379"},
+						DialTimeout: time.Second * 15,
+					}).Registry(),
+			))
 		}
 	}
 

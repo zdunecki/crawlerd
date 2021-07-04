@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"crawlerd/api"
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/storage"
 	"crawlerd/pkg/storage/objects"
+	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,15 +34,31 @@ type V1 interface {
 type v1 struct {
 	storage   storage.Storage
 	scheduler crawlerdpb.SchedulerClient
+
+	schedulerBackoff *backoff.ExponentialBackOff
+
+	log *log.Entry
 }
 
 func New(opts ...Option) (*v1, error) {
-	v := &v1{}
+	v := &v1{
+		log: log.WithFields(map[string]interface{}{
+			"service": "api",
+		}),
+	}
 
 	for _, o := range opts {
 		if err := o(v); err != nil {
 			return nil, err
 		}
+	}
+
+	{
+		bo := backoff.NewExponentialBackOff()
+		bo.MaxInterval = time.Second * 2
+		bo.MaxElapsedTime = time.Second * 15
+
+		v.schedulerBackoff = bo
 	}
 
 	return v, nil
@@ -65,13 +83,13 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 		}
 
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.InternalError()
 			return
 		}
 
 		if err := json.NewDecoder(bytes.NewReader(data)).Decode(&req); err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.BadRequest()
 			return
 		}
@@ -84,7 +102,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 		done, seq, err := v.storage.URL().InsertOne(ctx.RequestContext(), req.URL, req.Interval)
 
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.InternalError()
 			return
 		}
@@ -94,12 +112,15 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 			return
 		}
 
-		if _, err := v.scheduler.AddURL(ctx.RequestContext(), &crawlerdpb.RequestURL{
-			Id:       int64(seq),
-			Url:      req.URL,
-			Interval: int64(req.Interval),
+		if err := v.schedulerRequest(func() error {
+			_, e := v.scheduler.AddURL(ctx.RequestContext(), &crawlerdpb.RequestURL{
+				Id:       int64(seq),
+				Url:      req.URL,
+				Interval: int64(req.Interval),
+			})
+			return e
 		}); err != nil {
-			log.Error(err)
+			v.log.Error(err)
 		}
 
 		ctx.Created().JSON(&ResponsePostURL{
@@ -112,7 +133,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 
 		id, err := ctx.ParamInt("id")
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.BadRequest()
 			return
 		}
@@ -130,7 +151,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 		}
 
 		if err := json.NewDecoder(bytes.NewReader(data)).Decode(&req); err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.BadRequest()
 			return
 		}
@@ -140,7 +161,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 			Interval: req.Interval,
 		})
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.InternalError()
 			return
 		}
@@ -150,12 +171,15 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 			return
 		}
 
-		if _, err := v.scheduler.UpdateURL(ctx.RequestContext(), &crawlerdpb.RequestURL{
-			Id:       int64(id),
-			Url:      *req.URL,
-			Interval: int64(*req.Interval),
+		if err := v.schedulerRequest(func() error {
+			_, e := v.scheduler.UpdateURL(ctx.RequestContext(), &crawlerdpb.RequestURL{
+				Id:       int64(id),
+				Url:      *req.URL,
+				Interval: int64(*req.Interval),
+			})
+			return e
 		}); err != nil {
-			log.Error(err)
+			v.log.Error(err)
 		}
 
 		ctx.JSON(&ResponsePostURL{
@@ -166,7 +190,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 	v1.Delete("/api/urls/{id}", func(ctx api.Context) {
 		id, err := ctx.ParamInt("id")
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.BadRequest()
 			return
 		}
@@ -174,7 +198,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 		done, err := v.storage.URL().DeleteOneByID(ctx.RequestContext(), id)
 
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.InternalError()
 			return
 		}
@@ -184,10 +208,13 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 			return
 		}
 
-		if _, err := v.scheduler.DeleteURL(ctx.RequestContext(), &crawlerdpb.RequestDeleteURL{
-			Id: int64(id),
+		if err := v.schedulerRequest(func() error {
+			_, e := v.scheduler.DeleteURL(ctx.RequestContext(), &crawlerdpb.RequestDeleteURL{
+				Id: int64(id),
+			})
+			return e
 		}); err != nil {
-			log.Error(err)
+			v.log.Error(err)
 		}
 
 		ctx.NoContent()
@@ -196,7 +223,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 	v1.Get("/api/urls", func(ctx api.Context) {
 		urls, err := v.storage.URL().FindAll(ctx.RequestContext())
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.BadRequest()
 			return
 		}
@@ -211,14 +238,14 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 	v1.Get("/api/urls/{id}/history", func(ctx api.Context) {
 		id, err := ctx.ParamInt("id")
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.BadRequest()
 			return
 		}
 
 		history, err := v.storage.History().FindByID(ctx.RequestContext(), id)
 		if err != nil {
-			log.Error(err)
+			v.log.Error(err)
 			ctx.InternalError()
 			return
 		}
@@ -230,6 +257,10 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 		ctx.JSON(history)
 	})
 
-	log.Info("api: server listening on: ", addr)
+	v.log.Info("listening on: ", addr)
 	return http.ListenAndServe(addr, v1.Handler())
+}
+
+func (v *v1) schedulerRequest(f func() error) error {
+	return backoff.Retry(f, v.schedulerBackoff)
 }

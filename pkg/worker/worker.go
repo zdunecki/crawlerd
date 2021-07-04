@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -13,8 +12,6 @@ import (
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/util"
-
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -26,7 +23,6 @@ type Worker interface {
 	Serve(ctx context.Context) error
 
 	gracefulShutdown()
-	addrGen() (workerID, workerAddr string, err error)
 	newGRPC() (*grpc.Server, crawlerdpb.SchedulerClient, net.Listener, error)
 }
 
@@ -46,11 +42,27 @@ type worker struct {
 	cluster Cluster
 
 	log *log.Entry
+
+	config *Config
 }
 
+//func init() {
+//	if os.Getenv("DEBUG") == "1" { /
+//		log.SetLevel(log.DebugLevel)
+//	}
+//}
+
 func New(opts ...Option) (Worker, error) {
+	if os.Getenv("DEBUG") == "1" { // TODO: find better place but init is not the best because it runs before tests and we can't set DEBUG=1 programmatically during tests
+		log.SetLevel(log.DebugLevel)
+	}
+
 	worker := &worker{
 		schedulerAddr: ":9888",
+		log: log.WithFields(map[string]interface{}{
+			"service": "worker",
+		}),
+		config: InitConfig(),
 	}
 
 	for _, o := range opts {
@@ -76,7 +88,7 @@ func New(opts ...Option) (Worker, error) {
 	}
 
 	{
-		id, addr, err := worker.addrGen()
+		id, addr, err := worker.cluster.WorkerAddr()
 		if err != nil {
 			return nil, err
 		}
@@ -96,10 +108,6 @@ func New(opts ...Option) (Worker, error) {
 		worker.grpcserver = grpcsrv
 		worker.listener = lis
 	}
-
-	worker.log = log.WithFields(map[string]interface{}{
-		"service": "worker",
-	})
 
 	return worker, nil
 }
@@ -166,7 +174,7 @@ func (w *worker) gracefulShutdown() {
 
 	{
 
-		if err := w.cluster.Register(context.Background(), w); err != nil {
+		if err := w.cluster.Unregister(context.Background(), w); err != nil {
 			w.log.Error(err)
 			return
 		}
@@ -177,30 +185,14 @@ func (w *worker) gracefulShutdown() {
 	os.Exit(0)
 }
 
-func (w *worker) addrGen() (workerID, workerAddr string, err error) {
-	workerID = util.RandomString(10)
-	// TODO: attach another port if already exists
-	workerPort := strconv.Itoa(util.Between(9111, 9555))
-	workerHost, err := os.Hostname()
-	hostEnv := os.Getenv("WORKER_HOST")
-	if hostEnv != "" {
-		workerHost = hostEnv
-	} else {
-		if err != nil {
-			return "", "", err
-		}
-	}
-
-	workerAddr = net.JoinHostPort(workerHost, workerPort)
-
-	return workerID, workerAddr, nil
-}
-
 func (w *worker) newGRPC() (*grpc.Server, crawlerdpb.SchedulerClient, net.Listener, error) {
 	if w.addr == "" {
 		return nil, nil, nil, ErrEmptySchedulerGRPCSrvAddr
 	}
 	lis, err := net.Listen("tcp", w.addr)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	grpcsrv := grpc.NewServer()
 
 	crawlerdpb.RegisterWorkerServer(grpcsrv, NewServer(w.crawler))

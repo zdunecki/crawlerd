@@ -3,57 +3,24 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 
-	"crawlerd/api"
-	v1 "crawlerd/api/v1"
 	"crawlerd/api/v1/client"
 	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/scheduler"
 	storageopt "crawlerd/pkg/storage/options"
 	"crawlerd/pkg/worker"
-	"github.com/go-chi/chi/v5"
 	"github.com/orlangure/gnomock"
 	kafkapreset "github.com/orlangure/gnomock/preset/kafka"
 	mongopreset "github.com/orlangure/gnomock/preset/mongo"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
-type ETCDPreset struct {
-	Version string `json:"version"`
-}
-
-func (p *ETCDPreset) Image() string {
-	return fmt.Sprintf("docker.io/bitnami/etcd:%s", p.Version)
-}
-
-func (p *ETCDPreset) Ports() gnomock.NamedPorts {
-	return gnomock.DefaultTCP(2379)
-}
-
-func (p *ETCDPreset) Options() []gnomock.Option {
-	p.setDefaults()
-
-	opts := []gnomock.Option{
-		gnomock.WithEnv("ALLOW_NONE_AUTHENTICATION=yes"),
-	}
-
-	return opts
-}
-
-func (p *ETCDPreset) setDefaults() {
-	if p.Version == "" {
-		p.Version = "3"
-	}
-}
-
-func NewETCDPreset() gnomock.Preset {
-	return &ETCDPreset{}
-}
-
-func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string) {
+func testK8sWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string, k8s kubernetes.Interface, k8sNamespace string) {
 	kafka, err := pubsub.NewKafka(kafkaBroker)
 	if err != nil {
 		panic(err)
@@ -70,12 +37,7 @@ func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker 
 				}).Registry(),
 		),
 		worker.WithSchedulerGRPCAddr(schedulerGRPCAddr),
-		worker.WithETCDCluster(
-			clientv3.Config{
-				Endpoints:   []string{etcdAddr},
-				DialTimeout: time.Second * 15,
-			},
-		),
+		worker.WithK8sCluster(k8s, k8sNamespace),
 		worker.WithPubSub(kafka),
 	)
 
@@ -88,15 +50,13 @@ func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker 
 	}
 }
 
-func testScheduler(grpcAddr, mongoDBName, mongoURI, etcdAddr string) {
+func testK8sScheduler(grpcAddr, mongoDBName, mongoURI string, k8s kubernetes.Interface, k8sNamespace string) {
 	schedule, err := scheduler.New(
+		scheduler.WithWorkerClusterConfig(worker.InitConfig()),
 		scheduler.WithMongoDBStorage(mongoDBName, options.Client().ApplyURI(mongoURI)),
-		scheduler.WithWatcher(scheduler.NewWatcherOption().WithETCD(
-			clientv3.Config{
-				Endpoints:   []string{etcdAddr}, // get host from container
-				DialTimeout: time.Second * 15,
-			},
-		)),
+		scheduler.WithWatcher(scheduler.NewWatcherOption().
+			WithK8s(k8s, k8sNamespace),
+		),
 	)
 	if err != nil {
 		panic(err)
@@ -107,34 +67,8 @@ func testScheduler(grpcAddr, mongoDBName, mongoURI, etcdAddr string) {
 	}
 }
 
-func testApi(appAddr, schedulerGRPCAddr, mongoDBName, mongoURI string) {
-	apiV1, err := v1.New(
-		v1.WithMongoDBStorage(mongoDBName, options.Client().ApplyURI(mongoURI)),
-		v1.WithGRPCSchedulerServer(schedulerGRPCAddr),
-	)
-
-	if err != nil {
-		panic(err)
-	}
-
-	if err := apiV1.Serve(appAddr, api.New(chi.NewMux())); err != nil {
-		panic(err)
-	}
-}
-
-func randomPort() string {
-	min := 9890
-	max := 9900
-	return fmt.Sprintf("%d", rand.Intn(max-min)+min)
-}
-
-type setup struct {
-	etcdContainer *gnomock.Container
-	crawld        v1.V1
-	done          func()
-}
-
-func setupClient() (*setup, error) {
+// TODO: find better solution than sleep for waiting on services healtcheck
+func setupK8sClient(k8sNamespace string, k8sObjects ...runtime.Object) (*setup, error) {
 	containers := make([]*gnomock.Container, 0)
 
 	done := func() {
@@ -170,20 +104,21 @@ func setupClient() (*setup, error) {
 	kafkaBroker := kafkaContainer.Address("broker")
 	mongoURI := fmt.Sprintf("mongodb://%s", mongoContainer.DefaultAddress())
 	etcdAddr := etcdContainer.DefaultAddress()
+	k8s := fake.NewSimpleClientset(k8sObjects...)
+
+	go func() {
+		testK8sScheduler(schedulerGRPCAddr, dbName, mongoURI, k8s, k8sNamespace)
+	}()
+
+	go func() {
+		testK8sWorker(dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, k8s, k8sNamespace)
+	}()
+
+	time.Sleep(time.Second * 2)
 
 	go func() {
 		testApi(apiHost, schedulerGRPCAddr, dbName, mongoURI)
 	}()
-
-	go func() {
-		testScheduler(schedulerGRPCAddr, dbName, mongoURI, etcdAddr)
-	}()
-
-	go func() {
-		testWorker(dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker)
-	}()
-
-	time.Sleep(time.Second * 1)
 
 	c, err := client.NewWithOpts(client.WithHTTP("http://localhost:6666"))
 

@@ -121,13 +121,14 @@ func (u *urlrepo) DeleteOneByID(ctx context.Context, id int) (bool, error) {
 	return true, nil
 }
 
+// TODO: tests
 func (u *urlrepo) Scroll(ctx context.Context, f func([]objects.URL)) error {
 	cursor, err := u.coll.Find(ctx, bson.M{})
 	if err != nil {
 		return err
 	}
 
-	i := 0
+	i := 1
 
 	var urls []objects.URL
 
@@ -140,11 +141,11 @@ func (u *urlrepo) Scroll(ctx context.Context, f func([]objects.URL)) error {
 
 		urls = append(urls, url)
 
-		if i+1 >= u.defaultScroll {
+		if i >= u.defaultScroll {
 			f(urls)
 			urls = urls[:0]
 
-			i = 0
+			i = 1
 		} else {
 			i++
 		}

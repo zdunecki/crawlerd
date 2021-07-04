@@ -28,65 +28,15 @@ type HistoryRepository interface {
 }
 
 type RegistryRepository interface {
-	GetURLByID(int) (*objects.CrawlURL, error)
-	PutURL(objects.CrawlURL) error
-	DeleteURL(objects.CrawlURL) error
-	FindURLByWorkerID(string) ([]objects.CrawlURL, error)
-	DeleteURLByID(int) error
-
-	//crawlID(int) string
+	GetURLByID(context.Context, int) (*objects.CrawlURL, error)
+	PutURL(context.Context, objects.CrawlURL) error
+	DeleteURL(context.Context, objects.CrawlURL) error
+	FindURLByWorkerID(context.Context, string) ([]objects.CrawlURL, error)
+	DeleteURLByID(context.Context, int) error
 }
 
 type Storage interface {
 	URL() URLRepository
 	History() HistoryRepository
 	Registry() RegistryRepository
-}
-
-type storage struct {
-	url      URLRepository
-	history  HistoryRepository
-	registry RegistryRepository
-}
-
-func (s *storage) URL() URLRepository {
-	return s.url
-}
-
-func (s *storage) History() HistoryRepository {
-	return s.history
-}
-
-func (s *storage) Registry() RegistryRepository {
-	return s.registry
-}
-
-type Option func(*storage)
-
-func WithURL(r URLRepository) Option {
-	return func(s *storage) {
-		s.url = r
-	}
-}
-
-func WithHistory(r HistoryRepository) Option {
-	return func(s *storage) {
-		s.history = r
-	}
-}
-
-func WithRegistry(r RegistryRepository) Option {
-	return func(s *storage) {
-		s.registry = r
-	}
-}
-
-func NewStorage(opts ...Option) Storage {
-	s := &storage{}
-
-	for _, o := range opts {
-		o(s)
-	}
-
-	return s
 }

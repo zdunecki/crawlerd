@@ -17,17 +17,24 @@ type Controller interface {
 type controller struct {
 	scheduler crawlerdpb.SchedulerClient
 	registry  storage.RegistryRepository
+
+	log *log.Entry
 }
 
 func NewController(scheduler crawlerdpb.SchedulerClient, registry storage.RegistryRepository) Controller {
 	return &controller{
 		scheduler: scheduler,
 		registry:  registry,
+
+		log: log.WithFields(map[string]interface{}{
+			"service": "controller",
+		}),
 	}
 }
 
+// TODO: what should do on k8s?
 func (c *controller) ReAttachResources(urlC chan objects.CrawlURL) {
-	log.Infoln("attach jobs to another workers...")
+	c.log.Debugln("attach jobs to another workers...")
 
 	wg := sync.WaitGroup{}
 
@@ -45,10 +52,10 @@ func (c *controller) ReAttachResources(urlC chan objects.CrawlURL) {
 				wg.Done()
 				i++
 			}()
-			log.Infof("attaching id=%d", crawl.Id)
+			c.log.Debugf("attaching id=%d", crawl.Id)
 
-			if err := c.registry.DeleteURL(crawl); err != nil {
-				log.Error(err)
+			if err := c.registry.DeleteURL(context.Background(), crawl); err != nil {
+				c.log.Error(err)
 				return
 			}
 
@@ -57,7 +64,7 @@ func (c *controller) ReAttachResources(urlC chan objects.CrawlURL) {
 				Url:      crawl.Url,
 				Interval: crawl.Interval,
 			}); err != nil {
-				log.Error(err)
+				c.log.Error(err)
 			}
 
 			return

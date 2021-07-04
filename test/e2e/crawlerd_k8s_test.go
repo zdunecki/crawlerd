@@ -6,24 +6,56 @@ import (
 	"testing"
 	"time"
 
-	"crawlerd/api/v1"
+	crawldv1 "crawlerd/api/v1"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestCrawlOneURL(t *testing.T) {
-	os.Setenv("DEBUG", "1")
-	os.Setenv("WORKER_HOST", "localhost")
+// TODO: is it integration test?
 
-	setup, err := setupClient()
+func TestK8s(t *testing.T) {
+	namespace := "test"
+	k8sHost := "test-k8s-host"
+	k8sPodIP := "127.0.0.1" // TODO: tests different ips - needs fake network
+
+	os.Setenv("DEBUG", "1")
+	os.Setenv("WORKER_HOST", k8sHost)
+	os.Setenv("WORKER_GRPC_ADDR", "9115")
+
+	setup, err := setupK8sClient(
+		namespace,
+		&v1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Pod",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      k8sHost,
+				Labels: map[string]string{
+					"app": "test",
+				},
+			},
+			Spec: v1.PodSpec{
+				Hostname: k8sHost,
+			},
+			Status: v1.PodStatus{
+				PodIP: k8sPodIP,
+			},
+		},
+	)
+
 	if err != nil {
 		t.Error(err)
 		return
 	}
+
 	defer setup.done()
 	crawldURL := setup.crawld.URL()
 
 	setup.etcdContainer.DefaultAddress()
-	createResp, err := crawldURL.Create(&v1.RequestPostURL{
+	createResp, err := crawldURL.Create(&crawldv1.RequestPostURL{
 		URL:      "https://httpbin.org/range/1",
 		Interval: 15,
 	})
@@ -65,7 +97,7 @@ func TestCrawlOneURL(t *testing.T) {
 		return
 	}
 
-	if len(workerKv.Kvs) != 1 {
+	if len(workerKv.Kvs) != 0 {
 		t.Error("invalid expected running crawl workers length")
 		return
 	}
