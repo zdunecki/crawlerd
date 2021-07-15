@@ -34,7 +34,7 @@ func testK8sWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBrok
 				WithETCD(clientv3.Config{
 					Endpoints:   []string{etcdAddr},
 					DialTimeout: time.Second * 15,
-				}).Registry(),
+				}, 0).Registry(), // TODO: registryTTLBuffer > 0
 		),
 		worker.WithSchedulerGRPCAddr(schedulerGRPCAddr),
 		worker.WithK8sCluster(k8s, k8sNamespace),

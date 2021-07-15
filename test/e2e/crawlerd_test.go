@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"crawlerd/api/v1"
+	"crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -14,7 +15,7 @@ func TestCrawlOneURL(t *testing.T) {
 	os.Setenv("DEBUG", "1")
 	os.Setenv("WORKER_HOST", "localhost")
 
-	setup, err := setupClient()
+	setup, err := setupClient(&setupOptions{})
 	if err != nil {
 		t.Error(err)
 		return
@@ -22,7 +23,6 @@ func TestCrawlOneURL(t *testing.T) {
 	defer setup.done()
 	crawldURL := setup.crawld.URL()
 
-	setup.etcdContainer.DefaultAddress()
 	createResp, err := crawldURL.Create(&v1.RequestPostURL{
 		URL:      "https://httpbin.org/range/1",
 		Interval: 15,
@@ -59,7 +59,7 @@ func TestCrawlOneURL(t *testing.T) {
 		return
 	}
 
-	workerKv, err := etcd.Get(context.Background(), "worker", clientv3.WithPrefix())
+	workerKv, err := etcd.Get(context.Background(), worker.KeyWorker, clientv3.WithPrefix())
 	if err != nil {
 		t.Error(err)
 		return

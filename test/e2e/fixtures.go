@@ -21,6 +21,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+type setupOptions struct {
+	withCacheRegistry bool
+	registryTTLBuffer int64
+}
+
 type ETCDPreset struct {
 	Version string `json:"version"`
 }
@@ -53,7 +58,7 @@ func NewETCDPreset() gnomock.Preset {
 	return &ETCDPreset{}
 }
 
-func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string) {
+func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string, opts *setupOptions) {
 	kafka, err := pubsub.NewKafka(kafkaBroker)
 	if err != nil {
 		panic(err)
@@ -67,7 +72,7 @@ func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker 
 				WithETCD(clientv3.Config{
 					Endpoints:   []string{etcdAddr},
 					DialTimeout: time.Second * 15,
-				}).Registry(),
+				}, opts.registryTTLBuffer).Registry(),
 		),
 		worker.WithSchedulerGRPCAddr(schedulerGRPCAddr),
 		worker.WithETCDCluster(
@@ -77,6 +82,7 @@ func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker 
 			},
 		),
 		worker.WithPubSub(kafka),
+		worker.WithBrotliCompression(),
 	)
 
 	if err != nil {
@@ -134,7 +140,7 @@ type setup struct {
 	done          func()
 }
 
-func setupClient() (*setup, error) {
+func setupClient(opts *setupOptions) (*setup, error) {
 	containers := make([]*gnomock.Container, 0)
 
 	done := func() {
@@ -180,7 +186,7 @@ func setupClient() (*setup, error) {
 	}()
 
 	go func() {
-		testWorker(dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker)
+		testWorker(dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, opts)
 	}()
 
 	time.Sleep(time.Second * 1)
