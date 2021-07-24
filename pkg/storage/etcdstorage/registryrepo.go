@@ -11,15 +11,21 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-const PrefixKeyCrawlURL = "crawl."
+const minuteTTL = 60
+const defaultTTLBuffer = 1 * minuteTTL
+const KeyCrawlURL = "crawl"
+const PrefixKeyCrawlURL = KeyCrawlURL + "."
 
+// TODO: logger
 type registry struct {
-	etcd *clientv3.Client
+	etcd      *clientv3.Client
+	ttlBuffer int64
 }
 
-func NewRegistryRepository(etcd *clientv3.Client) storage.RegistryRepository {
+func NewRegistryRepository(etcd *clientv3.Client, ttlBuffer int64) storage.RegistryRepository {
 	return &registry{
-		etcd: etcd,
+		etcd:      etcd,
+		ttlBuffer: ttlBuffer,
 	}
 }
 
@@ -37,20 +43,41 @@ func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, e
 
 	var crawlURL *objects.CrawlURL
 
-	if err := json.NewDecoder(bytes.NewReader(resp.Kvs[0].Value)).Decode(&crawlURL); err != nil {
+	kv := resp.Kvs[0]
+	if err := json.NewDecoder(bytes.NewReader(kv.Value)).Decode(&crawlURL); err != nil {
+		return nil, err
+	}
+
+	// bump crawl url ttl before expiration
+	if _, err := r.etcd.KeepAliveOnce(context.Background(), clientv3.LeaseID(kv.Lease)); err != nil {
 		return nil, err
 	}
 
 	return crawlURL, nil
 }
 
+// TODO: ttl should be from paramter not directly in storage
+// TODO: lease ttl bump
 func (r *registry) PutURL(ctx context.Context, url objects.CrawlURL) error {
 	crawlUrlB, err := json.Marshal(url)
 	if err != nil {
 		return nil
 	}
 
-	if _, err := r.etcd.Put(ctx, r.crawlID(int(url.Id)), string(crawlUrlB)); err != nil {
+	buffer := r.ttlBuffer
+
+	if buffer == 0 {
+		buffer = defaultTTLBuffer
+	}
+
+	// lease is helpful for ensuring that if worker crash/restart key will expire soon and another process (Watcher.WatchNewURLs) take urls again to pool
+	// TODO: it's not a ideal solution - find better
+	lease, err := r.etcd.Grant(context.TODO(), url.Interval+buffer)
+	if err != nil {
+		return err
+	}
+
+	if _, err := r.etcd.Put(ctx, r.crawlID(int(url.Id)), string(crawlUrlB), clientv3.WithLease(lease.ID)); err != nil {
 		return err
 	}
 
@@ -65,41 +92,6 @@ func (r *registry) DeleteURL(ctx context.Context, url objects.CrawlURL) error {
 	return nil
 }
 
-//TODO: scroll
-func (r *registry) FindURLByWorkerID(ctx context.Context, id string) ([]objects.CrawlURL, error) {
-	var result []objects.CrawlURL
-
-	if resp, err := r.etcd.Get(ctx, PrefixKeyCrawlURL, clientv3.WithPrefix()); err != nil {
-		return nil, err
-	} else {
-		exists := resp.Kvs != nil && len(resp.Kvs) > 0
-
-		if !exists {
-			return nil, err
-		}
-
-		for _, kv := range resp.Kvs {
-			var crawlURL *objects.CrawlURL
-
-			if err := json.NewDecoder(bytes.NewReader(kv.Value)).Decode(&crawlURL); err != nil {
-				return nil, err
-			}
-
-			if crawlURL.WorkerID != id {
-				continue
-			}
-
-			if _, err := r.etcd.Delete(ctx, string(kv.Key)); err != nil {
-				return nil, err
-			}
-
-			result = append(result, *crawlURL)
-		}
-	}
-
-	return result, nil
-}
-
 func (r *registry) DeleteURLByID(ctx context.Context, id int) error {
 	if _, err := r.etcd.Delete(ctx, r.crawlID(id)); err != nil {
 		return err
@@ -109,5 +101,5 @@ func (r *registry) DeleteURLByID(ctx context.Context, id int) error {
 }
 
 func (r *registry) crawlID(id int) string {
-	return fmt.Sprintf("%s.%d", PrefixKeyCrawlURL, id)
+	return fmt.Sprintf("%s%d", PrefixKeyCrawlURL, id)
 }

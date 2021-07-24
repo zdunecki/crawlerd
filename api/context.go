@@ -7,9 +7,12 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/schema"
 )
 
 type ContextFn func(ctx Context)
+
+var decoder = schema.NewDecoder()
 
 type Context interface {
 	Created() Context
@@ -19,14 +22,17 @@ type Context interface {
 	RequestEntityTooLarge() Context
 	InternalError() Context
 
-	Bind(interface{}) error
+	RequestContext() context.Context
+
+	ResponseWriter() http.ResponseWriter
 	Request() *http.Request
+
+	Bind(interface{}) error
+	BindQuery(i interface{}) error
 
 	ParamInt(key string) (int, error)
 
 	JSON(interface{}) error
-
-	RequestContext() context.Context
 }
 
 type ctx struct {
@@ -70,6 +76,19 @@ func (c ctx) Bind(i interface{}) error {
 	}
 
 	return nil
+}
+
+func (c ctx) BindQuery(i interface{}) error {
+	values := c.request.URL.Query()
+	if len(values) == 0 {
+		return nil
+	}
+
+	return decoder.Decode(i, values)
+}
+
+func (c ctx) ResponseWriter() http.ResponseWriter {
+	return c.writer
 }
 
 func (c ctx) Request() *http.Request {

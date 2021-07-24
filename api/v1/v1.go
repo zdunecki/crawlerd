@@ -64,7 +64,7 @@ func New(opts ...Option) (*v1, error) {
 	return v, nil
 }
 
-func (v *v1) Serve(addr string, v1 api.Api) error {
+func (v *v1) Serve(addr string, v1 api.API) error {
 	if v.storage == nil {
 		return ErrNoStorage
 	}
@@ -112,7 +112,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 			return
 		}
 
-		if err := v.schedulerRequest(func() error {
+		if err := v.schedulerRetry(func() error {
 			_, e := v.scheduler.AddURL(ctx.RequestContext(), &crawlerdpb.RequestURL{
 				Id:       int64(seq),
 				Url:      req.URL,
@@ -171,7 +171,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 			return
 		}
 
-		if err := v.schedulerRequest(func() error {
+		if err := v.schedulerRetry(func() error {
 			_, e := v.scheduler.UpdateURL(ctx.RequestContext(), &crawlerdpb.RequestURL{
 				Id:       int64(id),
 				Url:      *req.URL,
@@ -208,7 +208,7 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 			return
 		}
 
-		if err := v.schedulerRequest(func() error {
+		if err := v.schedulerRetry(func() error {
 			_, e := v.scheduler.DeleteURL(ctx.RequestContext(), &crawlerdpb.RequestDeleteURL{
 				Id: int64(id),
 			})
@@ -261,6 +261,6 @@ func (v *v1) Serve(addr string, v1 api.Api) error {
 	return http.ListenAndServe(addr, v1.Handler())
 }
 
-func (v *v1) schedulerRequest(f func() error) error {
+func (v *v1) schedulerRetry(f func() error) error {
 	return backoff.Retry(f, v.schedulerBackoff)
 }

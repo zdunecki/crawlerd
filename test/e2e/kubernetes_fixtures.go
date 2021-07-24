@@ -20,13 +20,16 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func testK8sWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string, k8s kubernetes.Interface, k8sNamespace string) {
+func testK8sWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string, k8s kubernetes.Interface, k8sNamespace, k8sWorkerSelector string) {
 	kafka, err := pubsub.NewKafka(kafkaBroker)
 	if err != nil {
 		panic(err)
 	}
 
+	cfg := worker.InitConfig()
+
 	work, err := worker.New(
+		cfg,
 		worker.WithStorage(
 			storageopt.Client().
 				WithMongoDB(mongoDBName, options.Client().ApplyURI(mongoURI)).URL().History(),
@@ -37,7 +40,7 @@ func testK8sWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBrok
 				}, 0).Registry(), // TODO: registryTTLBuffer > 0
 		),
 		worker.WithSchedulerGRPCAddr(schedulerGRPCAddr),
-		worker.WithK8sCluster(k8s, k8sNamespace),
+		worker.WithK8sCluster(k8s, k8sNamespace, k8sWorkerSelector),
 		worker.WithPubSub(kafka),
 	)
 
@@ -50,12 +53,20 @@ func testK8sWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBrok
 	}
 }
 
-func testK8sScheduler(grpcAddr, mongoDBName, mongoURI string, k8s kubernetes.Interface, k8sNamespace string) {
+func testK8sScheduler(grpcAddr, mongoDBName, mongoURI, etcdAddr string, k8s kubernetes.Interface, k8sNamespace, workerSelector string) {
 	schedule, err := scheduler.New(
 		scheduler.WithWorkerClusterConfig(worker.InitConfig()),
-		scheduler.WithMongoDBStorage(mongoDBName, options.Client().ApplyURI(mongoURI)),
+		scheduler.WithStorage(
+			storageopt.Client().
+				WithMongoDB(mongoDBName, options.Client().ApplyURI(mongoURI)).URL().History(),
+			storageopt.Client().
+				WithETCD(clientv3.Config{
+					Endpoints:   []string{etcdAddr},
+					DialTimeout: time.Second * 15,
+				}, 0).Registry(), // TODO: registry ttl buffer
+		),
 		scheduler.WithWatcher(scheduler.NewWatcherOption().
-			WithK8s(k8s, k8sNamespace),
+			WithK8s(k8s, k8sNamespace, workerSelector),
 		),
 	)
 	if err != nil {
@@ -68,7 +79,7 @@ func testK8sScheduler(grpcAddr, mongoDBName, mongoURI string, k8s kubernetes.Int
 }
 
 // TODO: find better solution than sleep for waiting on services healtcheck
-func setupK8sClient(k8sNamespace string, k8sObjects ...runtime.Object) (*setup, error) {
+func setupK8sClient(k8sNamespace, k8sWorkerSelector string, k8sObjects ...runtime.Object) (*setup, error) {
 	containers := make([]*gnomock.Container, 0)
 
 	done := func() {
@@ -107,11 +118,11 @@ func setupK8sClient(k8sNamespace string, k8sObjects ...runtime.Object) (*setup, 
 	k8s := fake.NewSimpleClientset(k8sObjects...)
 
 	go func() {
-		testK8sScheduler(schedulerGRPCAddr, dbName, mongoURI, k8s, k8sNamespace)
+		testK8sScheduler(schedulerGRPCAddr, dbName, mongoURI, etcdAddr, k8s, k8sNamespace, k8sWorkerSelector)
 	}()
 
 	go func() {
-		testK8sWorker(dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, k8s, k8sNamespace)
+		testK8sWorker(dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, k8s, k8sNamespace, k8sWorkerSelector)
 	}()
 
 	time.Sleep(time.Second * 2)

@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -20,9 +21,9 @@ import (
 type Worker interface {
 	ID() string
 	Addr() string
-	Serve(ctx context.Context) error
+	Serve(context.Context) error
 
-	gracefulShutdown()
+	gracefulShutdown(context.Context)
 	newGRPC() (*grpc.Server, crawlerdpb.SchedulerClient, net.Listener, error)
 }
 
@@ -31,10 +32,12 @@ type worker struct {
 	addr          string
 	schedulerAddr string
 
-	storage storage.Storage
-	crawler Crawler
-	ctrl    Controller
-	pubsub  pubsub.PubSub
+	httpClient *http.Client
+	storage    storage.Storage
+	crawler    Crawler
+	ctrl       Controller
+	pubsub     pubsub.PubSub
+	compressor Compressor
 
 	grpcserver *grpc.Server
 	listener   net.Listener
@@ -44,6 +47,8 @@ type worker struct {
 	log *log.Entry
 
 	config *Config
+
+	finishedC chan bool
 }
 
 //func init() {
@@ -52,17 +57,24 @@ type worker struct {
 //	}
 //}
 
-func New(opts ...Option) (Worker, error) {
+func New(cfg *Config, opts ...Option) (Worker, error) {
 	if os.Getenv("DEBUG") == "1" { // TODO: find better place but init is not the best because it runs before tests and we can't set DEBUG=1 programmatically during tests
 		log.SetLevel(log.DebugLevel)
 	}
 
 	worker := &worker{
-		schedulerAddr: ":9888",
+		schedulerAddr: cfg.SchedulerGRPCAddr,
 		log: log.WithFields(map[string]interface{}{
 			"service": "worker",
 		}),
-		config: InitConfig(),
+		config:    cfg,
+		finishedC: make(chan bool),
+	}
+
+	if worker.schedulerAddr == "" {
+		// TODO: import cycle not allowed
+		// scheduler.DefaultSchedulerGRPCServerAddr
+		worker.schedulerAddr = ":9888"
 	}
 
 	for _, o := range opts {
@@ -79,9 +91,10 @@ func New(opts ...Option) (Worker, error) {
 		return nil, ErrRegistryIsRequired
 	}
 
-	if worker.pubsub == nil {
-		return nil, ErrPubSubIsRequired
-	}
+	// TODO: for k8s testing it's discarded
+	//if worker.pubsub == nil {
+	//	return nil, ErrPubSubIsRequired
+	//}
 
 	if worker.cluster == nil {
 		return nil, ErrWorkerIsRequired
@@ -96,7 +109,7 @@ func New(opts ...Option) (Worker, error) {
 		worker.id = id
 		worker.addr = addr
 
-		worker.crawler = NewCrawler(worker.storage, worker, worker.pubsub)
+		worker.crawler = NewCrawler(worker.storage, worker, worker.pubsub, worker.compressor, worker.httpClient)
 
 		grpcsrv, schedulercli, lis, err := worker.newGRPC()
 		if err != nil {
@@ -125,7 +138,7 @@ func (w *worker) Serve(ctx context.Context) error {
 		ctx = context.Background()
 	}
 
-	ctx.Done()
+	//ctx.Done()
 	maxWait := time.Minute
 
 	bo := backoff.NewExponentialBackOff()
@@ -134,25 +147,14 @@ func (w *worker) Serve(ctx context.Context) error {
 
 	once := &sync.Once{}
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				w.listener.Close()
-			}
-		}
-	}()
+	once.Do(func() {
+		go w.gracefulShutdown(ctx)
+	})
 
-	return backoff.Retry(func() error {
-		ctx := ctx
-
+	err := backoff.Retry(func() error {
 		if err := w.cluster.Register(context.Background(), w); err != nil {
 			return err
 		}
-
-		once.Do(func() {
-			go w.gracefulShutdown() // TODO: return channel
-		})
 
 		w.log.Info("listening on: ", w.listener.Addr())
 		err := w.grpcserver.Serve(w.listener)
@@ -163,18 +165,23 @@ func (w *worker) Serve(ctx context.Context) error {
 
 		return nil
 	}, bo)
+
+	<-w.finishedC
+
+	w.log.Debug("successfully gracefully shut down")
+
+	return err
 }
 
-func (w *worker) gracefulShutdown() {
+func (w *worker) gracefulShutdown(ctx context.Context) {
 	sigint := make(chan os.Signal, 1)
 
 	signal.Notify(sigint, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	<-sigint
+	unregister := func() {
+		w.log.Debug("gracefully shutting down...")
 
-	{
-
-		if err := w.cluster.Unregister(context.Background(), w); err != nil {
+		if err := w.cluster.DeleteByID(context.Background(), w.ID()); err != nil {
 			w.log.Error(err)
 			return
 		}
@@ -182,7 +189,23 @@ func (w *worker) gracefulShutdown() {
 		w.crawler.Stop(w.ctrl.ReAttachResources)
 	}
 
-	os.Exit(0)
+	// TODO: need to support this case - grpc server failed but context and sigint didn't call
+	for {
+		select {
+		case <-sigint:
+			w.grpcserver.GracefulStop()
+			unregister()
+			w.finishedC <- true
+			return
+		case <-ctx.Done():
+			w.grpcserver.GracefulStop()
+			unregister()
+			w.finishedC <- true
+			return
+		}
+	}
+
+	//os.Exit(0)
 }
 
 func (w *worker) newGRPC() (*grpc.Server, crawlerdpb.SchedulerClient, net.Listener, error) {

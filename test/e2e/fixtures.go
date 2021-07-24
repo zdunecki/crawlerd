@@ -22,8 +22,9 @@ import (
 )
 
 type setupOptions struct {
-	withCacheRegistry bool
-	registryTTLBuffer int64
+	withCacheRegistry     bool
+	registryTTLBuffer     int64
+	additionalWorkerCount int
 }
 
 type ETCDPreset struct {
@@ -58,13 +59,16 @@ func NewETCDPreset() gnomock.Preset {
 	return &ETCDPreset{}
 }
 
-func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string, opts *setupOptions) {
+func testWorker(e2e *worker_e2e, mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string, opts *setupOptions) {
 	kafka, err := pubsub.NewKafka(kafkaBroker)
 	if err != nil {
 		panic(err)
 	}
 
+	cfg := worker.InitConfig()
+
 	work, err := worker.New(
+		cfg,
 		worker.WithStorage(
 			storageopt.Client().
 				WithMongoDB(mongoDBName, options.Client().ApplyURI(mongoURI)).URL().History(),
@@ -89,14 +93,23 @@ func testWorker(mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker 
 		panic(err)
 	}
 
-	if err := work.Serve(context.Background()); err != nil {
+	if err := work.Serve(e2e.ctx); err != nil {
 		panic(err)
 	}
+	e2e.doneC <- true
 }
 
 func testScheduler(grpcAddr, mongoDBName, mongoURI, etcdAddr string) {
 	schedule, err := scheduler.New(
-		scheduler.WithMongoDBStorage(mongoDBName, options.Client().ApplyURI(mongoURI)),
+		scheduler.WithStorage(
+			storageopt.Client().
+				WithMongoDB(mongoDBName, options.Client().ApplyURI(mongoURI)).URL().History(),
+			storageopt.Client().
+				WithETCD(clientv3.Config{
+					Endpoints:   []string{etcdAddr},
+					DialTimeout: time.Second * 15,
+				}, 0).Registry(), // TODO: registry ttl buffer
+		),
 		scheduler.WithWatcher(scheduler.NewWatcherOption().WithETCD(
 			clientv3.Config{
 				Endpoints:   []string{etcdAddr}, // get host from container
@@ -134,10 +147,22 @@ func randomPort() string {
 	return fmt.Sprintf("%d", rand.Intn(max-min)+min)
 }
 
+type worker_e2e struct {
+	ctx       context.Context
+	ctxCancel func()
+
+	doneC chan bool
+}
+
+func (w *worker_e2e) done() <-chan bool {
+	return w.doneC
+}
+
 type setup struct {
 	etcdContainer *gnomock.Container
 	crawld        v1.V1
 	done          func()
+	worker_e2e    []*worker_e2e
 }
 
 func setupClient(opts *setupOptions) (*setup, error) {
@@ -185,9 +210,36 @@ func setupClient(opts *setupOptions) (*setup, error) {
 		testScheduler(schedulerGRPCAddr, dbName, mongoURI, etcdAddr)
 	}()
 
+	workere2e := make([]*worker_e2e, 0)
 	go func() {
-		testWorker(dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, opts)
+		workerCtx, workerCtxCancel := context.WithCancel(context.Background())
+		e2e := &worker_e2e{
+			ctx:       workerCtx,
+			ctxCancel: workerCtxCancel,
+			doneC:     make(chan bool),
+		}
+		workere2e = append(workere2e, e2e)
+
+		testWorker(e2e, dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, opts)
 	}()
+
+	if opts.additionalWorkerCount > 0 {
+		for i := 0; i < opts.additionalWorkerCount; i++ {
+			time.Sleep(time.Second * 1)
+
+			go func() {
+				workerCtx, workerCtxCancel := context.WithCancel(context.Background())
+				e2e := &worker_e2e{
+					ctx:       workerCtx,
+					ctxCancel: workerCtxCancel,
+					doneC:     make(chan bool),
+				}
+				workere2e = append(workere2e, e2e)
+
+				testWorker(e2e, dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, opts)
+			}()
+		}
+	}
 
 	time.Sleep(time.Second * 1)
 
@@ -197,5 +249,6 @@ func setupClient(opts *setupOptions) (*setup, error) {
 		etcdContainer: etcdContainer,
 		crawld:        c,
 		done:          done,
+		worker_e2e:    workere2e,
 	}, err
 }

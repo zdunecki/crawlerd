@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
+	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
 	"crawlerd/pkg/storage"
 	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
@@ -36,12 +37,6 @@ type scheduler struct {
 	log *log.Entry
 }
 
-//func init() {
-//	if os.Getenv("DEBUG") == "1" { /
-//		log.SetLevel(log.DebugLevel)
-//	}
-//}
-
 func New(opts ...Option) (Scheduler, error) {
 	if os.Getenv("DEBUG") == "1" { // TODO: find better place but init is not the best because it runs before tests and we can't set DEBUG=1 programmatically during tests
 		log.SetLevel(log.DebugLevel)
@@ -63,16 +58,18 @@ func New(opts ...Option) (Scheduler, error) {
 	}
 
 	if s.storage == nil {
-		return nil, ErrStorageIsRequired
+		return nil, kitscheduler.ErrStorageIsRequired
 	}
 
 	if s.watcher == nil {
-		return nil, ErrWatcherIsRequired
+		return nil, kitscheduler.ErrWatcherIsRequired
 	}
 
 	if s.leasing == nil {
-		return nil, ErrLeasingIsRequired
+		return nil, kitscheduler.ErrLeasingIsRequired
 	}
+
+	srv.setLasing(s.leasing)
 
 	return s, nil
 }
@@ -88,7 +85,7 @@ func (s *scheduler) Serve(addr string) error {
 
 	return backoff.Retry(func() error {
 		s.log.Debug("lease")
-		if err := s.leasing.Lease(); err != nil && err != ErrNoWorkers {
+		if err := s.leasing.Lease(); err != nil && err != kitscheduler.ErrNoWorkers {
 			s.log.Debug("lease err: " + err.Error())
 			return err
 		}
@@ -120,7 +117,7 @@ func (s *scheduler) watchWorkers() {
 	s.watcher.WatchWorkers(func(ev WorkerWatcherEvent) {
 		switch ev {
 		case WorkerWatcherEventDelete, WorkerWatcherEventPut, WorkerWatcherEventTicker:
-			if err := s.leasing.Lease(); err != nil && err != ErrNoWorkers {
+			if err := s.leasing.Lease(); err != nil && err != kitscheduler.ErrNoWorkers {
 				s.log.Error(err)
 				return
 			}

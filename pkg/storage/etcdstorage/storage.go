@@ -13,9 +13,9 @@ type Storage interface {
 	storage.Storage
 }
 
-func NewStorage(c *clientv3.Client) Storage {
+func NewStorage(c *clientv3.Client, registryTTLBuffer int64) Storage {
 	return &etcd{
-		registryRepo: NewRegistryRepository(c),
+		registryRepo: NewRegistryRepository(c, registryTTLBuffer),
 	}
 }
 

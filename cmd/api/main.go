@@ -13,17 +13,23 @@ import (
 
 func main() {
 	var (
-		dbName        string
-		mongo         bool
-		mongoHost     string
-		grpc          bool
+		dbName string
+
+		mongo     bool
+		mongoHost string
+		mongoPort string
+
+		grpc bool
+
 		schedulerAddr string
-		addr          string
+
+		addr string
 	)
 
 	flag.StringVar(&dbName, "db", "crawlerd", "database name")
 	flag.BoolVar(&mongo, "mongo", true, "use mongodb as a database source")
 	flag.StringVar(&mongoHost, "mongo-host", "", "mongo host")
+	flag.StringVar(&mongoPort, "mongo-port", "27017", "mongo port")
 	flag.BoolVar(&grpc, "grpc", true, "use grpc as a scheduler serer")
 	flag.StringVar(&schedulerAddr, "scheduler-addr", scheduler.DefaultSchedulerGRPCServerAddr, "scheduler grpc addr")
 	flag.StringVar(&addr, "addr", ":8080", "http server addr")
@@ -37,7 +43,7 @@ func main() {
 			opts = append(opts, v1.WithMongoDBStorage(dbName))
 		} else {
 			opts = append(opts, v1.WithMongoDBStorage(dbName, options.Client().ApplyURI(
-				fmt.Sprintf("mongodb://%s:27017", mongoHost),
+				fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort),
 			)))
 		}
 	}
@@ -50,7 +56,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := apiV1.Serve(addr, api.New(chi.NewMux())); err != nil {
+	if err := apiV1.Serve(addr, api.New(chi.NewRouter())); err != nil {
 		panic(err)
 	}
 }

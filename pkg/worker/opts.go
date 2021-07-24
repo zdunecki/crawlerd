@@ -1,20 +1,20 @@
 package worker
 
 import (
+	"bytes"
+	"net/http"
 	"time"
 
 	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/storage/options"
+	"github.com/andybalholm/brotli"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/client-go/kubernetes"
 )
 
 type (
-	Option func(*worker) error
-
-	EtcdOption struct {
-		config clientv3.Config
-	}
+	Option     func(*worker) error
+	Compressor func([]byte) ([]byte, error)
 )
 
 var (
@@ -38,17 +38,39 @@ func WithPubSub(pubsub pubsub.PubSub) Option {
 	}
 }
 
-func NewETCDOption() *EtcdOption {
-	return &EtcdOption{}
+func WithCompression(compressor Compressor) Option {
+	return func(w *worker) error {
+		w.compressor = compressor
+		return nil
+	}
 }
 
-func (o *EtcdOption) ApplyConfig(cfg clientv3.Config) *EtcdOption {
-	o.config = cfg
-
-	return o
+func WithHTTPClient(client *http.Client) Option {
+	return func(w *worker) error {
+		w.httpClient = client
+		return nil
+	}
 }
 
-// TODO: k8s cluster
+func WithBrotliCompression() Option { // TODO:  cbrotli vs brotli
+	return func(w *worker) error {
+		return WithCompression(func(d []byte) ([]byte, error) {
+			buff := new(bytes.Buffer)
+			compressed := brotli.NewWriter(buff)
+
+			if _, err := compressed.Write(d); err != nil {
+				return nil, err
+			}
+
+			if err := compressed.Close(); err != nil {
+				return nil, err
+			}
+
+			return buff.Bytes(), nil
+		})(w)
+	}
+}
+
 func WithETCDCluster(optCfg ...clientv3.Config) Option {
 	return func(w *worker) error {
 		cfg := DefaultETCDConfig
@@ -69,9 +91,9 @@ func WithETCDCluster(optCfg ...clientv3.Config) Option {
 	}
 }
 
-func WithK8sCluster(client kubernetes.Interface, namespace string) Option {
+func WithK8sCluster(client kubernetes.Interface, namespace string, workerSelector string) Option {
 	return func(w *worker) error {
-		w.cluster = NewK8sCluster(client, namespace, w.config)
+		w.cluster = NewK8sCluster(client, namespace, workerSelector, w.config)
 
 		return nil
 	}

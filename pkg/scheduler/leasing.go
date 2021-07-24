@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
+	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
 	"crawlerd/pkg/roundrobin"
 	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
@@ -48,7 +49,7 @@ func (l *leasing) Lease() error {
 
 		if workers == nil || len(workers) == 0 {
 			l.srv.PutWorkerGen(nil)
-			return ErrNoWorkers
+			return kitscheduler.ErrNoWorkers
 		}
 
 		workerClients := make([]interface{}, len(workers))
@@ -57,6 +58,8 @@ func (l *leasing) Lease() error {
 			var grpcconn *grpc.ClientConn
 
 			err := l.newBackoff(func() error {
+				l.log.Debug("try connect with worker")
+
 				ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
 				//TODO: insecure
 
@@ -69,6 +72,8 @@ func (l *leasing) Lease() error {
 			})
 
 			if err != nil {
+				l.log.Debug("cannot connect with worker")
+
 				workerID := w.ID
 				l.log.Warn("delete worker: ", workerID)
 				if err := l.workerCluster.DeleteByID(context.Background(), workerID); err != nil {
@@ -81,8 +86,9 @@ func (l *leasing) Lease() error {
 			workerClients[i] = crawlerdpb.NewWorkerClient(grpcconn)
 		}
 
-		robinGen := roundrobin.New(workerClients)
+		l.log.Debug("re lease workers")
 
+		robinGen := roundrobin.New(workerClients)
 		l.srv.PutWorkerGen(robinGen)
 
 		return nil

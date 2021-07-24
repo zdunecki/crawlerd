@@ -31,7 +31,6 @@ type RegistryRepository interface {
 	GetURLByID(context.Context, int) (*objects.CrawlURL, error)
 	PutURL(context.Context, objects.CrawlURL) error
 	DeleteURL(context.Context, objects.CrawlURL) error
-	FindURLByWorkerID(context.Context, string) ([]objects.CrawlURL, error)
 	DeleteURLByID(context.Context, int) error
 }
 

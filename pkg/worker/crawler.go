@@ -60,6 +60,7 @@ type crawler struct {
 	processor  *processor
 	pageLookup *pageLookup
 	pubsub     pubsub.PubSub
+	compressor Compressor
 
 	stopC       map[QueueInterval]chan bool
 	ticker      map[QueueInterval]*time.Ticker
@@ -69,13 +70,11 @@ type crawler struct {
 	log *log.Entry
 }
 
-func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub) Crawler {
-	return &crawler{
+func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub, compressor Compressor, httpClient *http.Client) Crawler {
+	c := &crawler{
 		wgStop: &sync.WaitGroup{},
 
-		httpClient: &http.Client{
-			Timeout: HTTPClientTimeout,
-		},
+		httpClient: httpClient,
 
 		worker:     worker,
 		history:    storage.History(),
@@ -83,6 +82,7 @@ func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub) Cr
 		processor:  NewProcessor(),
 		pageLookup: NewPageLookup(),
 		pubsub:     pubsub,
+		compressor: compressor,
 
 		stopC:       make(map[QueueInterval]chan bool),
 		ticker:      make(map[QueueInterval]*time.Ticker),
@@ -93,6 +93,14 @@ func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub) Cr
 			"service": "crawler",
 		}),
 	}
+
+	if c.httpClient == nil {
+		c.httpClient = &http.Client{
+			Timeout: HTTPClientTimeout,
+		}
+	}
+
+	return c
 }
 
 func (c *crawler) Dequeue(id int64) {
@@ -217,7 +225,6 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 					crawledLen++
 
 					go func() {
-						c.log.Debug("trying fetch resource")
 						defer wg.Done()
 
 						if err := c.fetchContent(crawlQ); err != nil {
@@ -225,6 +232,8 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 						}
 					}()
 
+					// TODO: in-memory may increase performance? consider how to get current value in memory instead of in distributed kv db.
+					// TODO: on of the solutions may be high efficient in-memory cache with kv watchers about update's information.
 					reCrawlUrl, err := c.registry.GetURLByID(context.Background(), int(crawlQ.Id))
 					if err != nil {
 						c.log.Error(err)
@@ -278,7 +287,7 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 	}
 }
 
-// TODO: find best algorithm for HTML compression
+// TODO: gridfs vs ioutil.ReadAll
 func (c *crawler) fetchContent(crawl objects.CrawlURL) error {
 	c.log.Debug("trying fetch content")
 
@@ -292,7 +301,19 @@ func (c *crawler) fetchContent(crawl objects.CrawlURL) error {
 		l := c.log.WithFields(log.Fields{
 			"id": crawl.Id,
 		})
-		if _, _, err := c.history.InsertOne(context.Background(), int(crawl.Id), body, finish.Sub(start), start); err != nil {
+
+		writeData := body
+
+		if c.compressor != nil {
+			compressed, err := c.compressor(writeData)
+			if err != nil {
+				l.Debugf("err: %v", err)
+			} else if compressed != nil {
+				writeData = compressed
+			}
+		}
+
+		if _, _, err := c.history.InsertOne(context.Background(), int(crawl.Id), writeData, finish.Sub(start), start); err != nil {
 			return err
 		}
 
@@ -300,6 +321,7 @@ func (c *crawler) fetchContent(crawl objects.CrawlURL) error {
 		return nil
 	}
 
+	// TODO: stream to db instead of read all to memory
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		c.log.Error(err)

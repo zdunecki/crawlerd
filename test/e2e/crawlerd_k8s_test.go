@@ -16,6 +16,7 @@ import (
 
 func TestK8s(t *testing.T) {
 	namespace := "test"
+	k8sWorkerSelector := "app=test-worker"
 	k8sHost := "test-k8s-host"
 	k8sPodIP := "127.0.0.1" // TODO: tests different ips - needs fake network
 
@@ -25,6 +26,7 @@ func TestK8s(t *testing.T) {
 
 	setup, err := setupK8sClient(
 		namespace,
+		k8sWorkerSelector,
 		&v1.Pod{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Pod",
@@ -34,7 +36,7 @@ func TestK8s(t *testing.T) {
 				Namespace: namespace,
 				Name:      k8sHost,
 				Labels: map[string]string{
-					"app": "test",
+					"app": k8sWorkerSelector,
 				},
 			},
 			Spec: v1.PodSpec{

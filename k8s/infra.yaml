@@ -1,0 +1,71 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd
+spec:
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+    spec:
+      containers:
+        - image: bitnami/etcd:3
+          name: etcd
+          ports:
+            - containerPort: 2379
+              name: etcd
+          env:
+            - name: ALLOW_NONE_AUTHENTICATION
+              value: "yes"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  labels:
+    app: etcd
+spec:
+  selector:
+    app: etcd
+  type: NodePort
+  ports:
+    - port: 2379
+      nodePort: 31018
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo
+spec:
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - image: mongo:4.4
+          name: mongo
+          ports:
+            - containerPort: 27017
+              name: mongo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  labels:
+    app: mongo
+spec:
+  selector:
+    app: mongo
+  type: NodePort
+  ports:
+    - port: 27017
+      nodePort: 31017

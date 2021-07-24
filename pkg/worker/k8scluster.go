@@ -7,22 +7,26 @@ import (
 	"strconv"
 
 	"crawlerd/pkg/util"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sv1 "k8s.io/api/core/v1"
+	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 )
 
 type k8sCluster struct {
-	client    kubernetes.Interface
-	namespace string
+	client         kubernetes.Interface
+	namespace      string
+	workerSelector string
 
 	cfg *Config
 }
 
-func NewK8sCluster(client kubernetes.Interface, namespace string, cfg *Config) Cluster {
+func NewK8sCluster(client kubernetes.Interface, namespace, workerSelector string, cfg *Config) Cluster {
 	return &k8sCluster{
-		client:    client,
-		namespace: namespace,
+		client:         client,
+		namespace:      namespace,
+		workerSelector: workerSelector,
 
 		cfg: cfg,
 	}
@@ -34,17 +38,24 @@ func (k *k8sCluster) Register(ctx context.Context, w Worker) error {
 	return nil
 }
 
-func (k *k8sCluster) Unregister(ctx context.Context, w Worker) error {
-	// k8s unregister pods itself?
-
-	return nil
-}
-
 func (k *k8sCluster) GetAll(ctx context.Context) ([]*WorkerMeta, error) {
-	// TODO: label/namespace matcher because scheduler and api can run on the same kubernetes
-	pods, err := k.client.CoreV1().Pods(k.namespace).List(ctx, metav1.ListOptions{
-		TypeMeta:             metav1.TypeMeta{},
-		LabelSelector:        "",
+	labelSelector := ""
+
+	if k.workerSelector != "" {
+		selector, err := k8slabels.Parse(k.workerSelector)
+		if err != nil {
+			return nil, err
+		}
+
+		if selector != nil && selector.String() != "" {
+			labelSelector = selector.String()
+		}
+	}
+
+	// TODO: label/namespace matcher because scheduler and api can run on the same kubernetes namespace
+	pods, err := k.client.CoreV1().Pods(k.namespace).List(ctx, k8smetav1.ListOptions{
+		TypeMeta:             k8smetav1.TypeMeta{},
+		LabelSelector:        labelSelector,
 		FieldSelector:        "",
 		Watch:                false,
 		AllowWatchBookmarks:  false,
@@ -61,7 +72,15 @@ func (k *k8sCluster) GetAll(ctx context.Context) ([]*WorkerMeta, error) {
 
 	workerMetas := make([]*WorkerMeta, 0)
 
+	// TODO: wait for terminating status
+
 	for _, pod := range pods.Items {
+		// TODO: wait for pending pods
+
+		if pod.Status.Phase != k8sv1.PodRunning || pod.DeletionTimestamp != nil {
+			continue
+		}
+
 		workerMetas = append(workerMetas, &WorkerMeta{
 			ID: pod.Name,
 			// TODO: below
@@ -78,13 +97,14 @@ func (k *k8sCluster) GetAll(ctx context.Context) ([]*WorkerMeta, error) {
 }
 
 func (k *k8sCluster) DeleteByID(ctx context.Context, id string) error {
-	return k.client.CoreV1().Pods(k.namespace).Delete(ctx, id, metav1.DeleteOptions{})
+	// k8s delete pods itself?
+	return nil
 }
 
 func (k *k8sCluster) Watch(f func(EventType)) error {
-	// TODO: label/namespace matcher because scheduler and api can run on the same kubernetes
-	watchPods, err := k.client.CoreV1().Pods(k.namespace).Watch(context.Background(), metav1.ListOptions{
-		TypeMeta:             metav1.TypeMeta{},
+	// TODO: label/namespace matcher because scheduler and api can run on the same kubernetes namespace
+	watchPods, err := k.client.CoreV1().Pods(k.namespace).Watch(context.Background(), k8smetav1.ListOptions{
+		TypeMeta:             k8smetav1.TypeMeta{},
 		LabelSelector:        "",
 		FieldSelector:        "",
 		Watch:                false,
@@ -141,7 +161,7 @@ func (k *k8sCluster) WorkerAddr() (id, host string, err error) {
 	}
 
 	//ip, err := util.ResolveHostIP()
-	pod, err := k.client.CoreV1().Pods(k.namespace).Get(context.Background(), workerHost, metav1.GetOptions{})
+	pod, err := k.client.CoreV1().Pods(k.namespace).Get(context.Background(), workerHost, k8smetav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}

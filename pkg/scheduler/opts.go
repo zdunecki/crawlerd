@@ -3,17 +3,18 @@ package scheduler
 import (
 	"time"
 
+	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/mgostorage"
+	"crawlerd/pkg/storage/options"
 	"crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"k8s.io/client-go/kubernetes"
 )
 
 type k8sConfig struct {
-	client    kubernetes.Interface
-	namespace string
+	client         kubernetes.Interface
+	namespace      string
+	workerSelector string
 }
 
 type (
@@ -46,10 +47,11 @@ func (o *WatcherOption) WithETCD(cfg clientv3.Config) *WatcherOption {
 	return o
 }
 
-func (o *WatcherOption) WithK8s(client kubernetes.Interface, namespace string) *WatcherOption {
+func (o *WatcherOption) WithK8s(client kubernetes.Interface, namespace, workerSelector string) *WatcherOption {
 	o.k8sConfig = &k8sConfig{
-		client:    client,
-		namespace: namespace,
+		client:         client,
+		namespace:      namespace,
+		workerSelector: workerSelector,
 	}
 
 	return o
@@ -96,7 +98,7 @@ func WithWatcher(opts ...*WatcherOption) Option {
 
 			if o.k8sConfig != nil {
 				s.log.Debug("use k8s leasing")
-				workerCluster = worker.NewK8sCluster(o.k8sConfig.client, o.k8sConfig.namespace, s.clusterConfig)
+				workerCluster = worker.NewK8sCluster(o.k8sConfig.client, o.k8sConfig.namespace, o.k8sConfig.workerSelector, s.clusterConfig)
 				s.leasing = NewLeasing(workerCluster, s.server)
 			} else if o.etcdConfig != nil {
 				s.log.Debug("use etcd leasing")
@@ -107,7 +109,15 @@ func WithWatcher(opts ...*WatcherOption) Option {
 		}
 
 		if storage == nil {
-			return ErrStorageIsRequired
+			return kitscheduler.ErrStorageIsRequired
+		}
+
+		if storage.URL() == nil {
+			return kitscheduler.ErrURLRepositoryIsRequired
+		}
+
+		if storage.Registry() == nil {
+			return kitscheduler.ErrRegistryRepositoryIsRequired
 		}
 
 		if workerCluster == nil {
@@ -118,27 +128,24 @@ func WithWatcher(opts ...*WatcherOption) Option {
 		}
 
 		if workerCluster == nil {
-			return ErrClusterIsRequired
+			return kitscheduler.ErrClusterIsRequired
 		}
 
-		s.watcher = NewWatcher(workerCluster, storage.URL(), timerTimeOut)
+		s.watcher = NewWatcher(workerCluster, storage.URL(), storage.Registry(), timerTimeOut)
 
 		return nil
 	}
 }
 
-func WithMongoDBStorage(dbName string, opts ...*options.ClientOptions) Option {
+func WithStorage(opts ...*options.RepositoryOption) Option {
 	return func(s *scheduler) error {
-		client, err := mgostorage.NewClient(opts...)
+		storage, err := options.WithStorage(opts...)
+
 		if err != nil {
 			return err
 		}
 
-		if dbName != "" {
-			client.SetDatabaseName(dbName)
-		}
-
-		s.storage = mgostorage.NewStorage(client.DB())
+		s.storage = storage
 
 		return nil
 	}

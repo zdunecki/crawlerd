@@ -32,17 +32,27 @@ type watcher struct {
 	workerCluster worker.Cluster
 	url           storage.URLRepository
 	registry      storage.RegistryRepository
+	mu            *sync.RWMutex
+	jobDoneC      chan bool
+	isJobRunning  bool
+	retryJob      bool
 
 	urlTimerTimeout time.Duration
 	urlTimer        *time.Timer
+
+	log *log.Entry
 }
 
-func NewWatcher(workerCluster worker.Cluster, url storage.URLRepository, timerTimeout time.Duration) Watcher {
+func NewWatcher(workerCluster worker.Cluster, url storage.URLRepository, registry storage.RegistryRepository, timerTimeout time.Duration) Watcher {
 	return &watcher{
 		workerCluster:   workerCluster,
 		url:             url,
+		registry:        registry,
 		urlTimerTimeout: timerTimeout,
 		urlTimer:        time.NewTimer(timerTimeout),
+		mu:              &sync.RWMutex{},
+		jobDoneC:        make(chan bool),
+		log:             log.WithFields(map[string]interface{}{}),
 	}
 }
 
@@ -73,22 +83,35 @@ func (w *watcher) WatchWorkers(f func(WorkerWatcherEvent)) {
 }
 
 // TODO: tests
+// WatchNewURLs loop through all url's and send to crawl if neither worker didn't do that
+// it's helpful especially at start process if any url already exist in database
 func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 	justNow := time.NewTimer(time.Second)
 
-	wg := sync.WaitGroup{}
+	// TODO: add tests - multiple jobs in short time
+	job := func() {
+		w.log.Debug("try to find new url's to start crawl")
 
-	job := func(wait bool) {
-		defer func() {
-			if wait {
-				wg.Done()
-			}
-		}()
-		if wait {
-			wg.Add(1)
+		w.mu.Lock()
+		if w.isJobRunning {
+			w.retryJob = true
+			w.mu.Unlock()
+			return
 		}
+		w.retryJob = false
+		w.isJobRunning = true
+		w.mu.Unlock()
 
+		defer func() {
+			w.mu.Lock()
+			w.isJobRunning = false
+			w.mu.Unlock()
+		}()
+
+		// TODO: consider better solution than scrolling whole urls
 		if err := w.url.Scroll(context.Background(), func(urls []objects.URL) {
+			w.log.Debugf("found url's candidates to start crawl, len=%d", len(urls))
+
 			for _, url := range urls {
 				go func(url objects.URL) {
 					resp, err := w.registry.GetURLByID(context.Background(), url.ID)
@@ -114,16 +137,27 @@ func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 		}); err != nil {
 			log.Error(err)
 		}
+
+		// TODO: consider when watch urls should done
+		//w.jobDoneC <- true
 	}
 
 	for {
 		select {
 		case <-w.urlTimer.C:
-			job(true)
-			wg.Wait()
+			job()
 			w.urlTimer.Reset(w.urlTimerTimeout)
 		case <-justNow.C:
-			job(false)
+			job()
+			w.urlTimer.Reset(w.urlTimerTimeout)
+		case <-w.jobDoneC:
+			w.mu.RLock()
+			if w.retryJob {
+				w.mu.RUnlock()
+				job()
+				return
+			}
+			w.mu.RUnlock()
 		}
 	}
 }

@@ -7,34 +7,62 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"crawlerd/pkg/util"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-const PrefixKeyWorker = "worker."
+const KeyWorker = "worker"
+const PrefixKeyWorker = KeyWorker + "."
+
+const registerTTL = 60
+const bumpRegisterTTL = registerTTL / 2
 
 type etcdCluster struct {
 	etcd *clientv3.Client
+	once *sync.Once
 }
+
+// TODO: logger
 
 func NewETCDCluster(etcd *clientv3.Client) Cluster {
 	return &etcdCluster{
 		etcd: etcd,
+		once: &sync.Once{},
 	}
 }
 
 func (c *etcdCluster) Register(ctx context.Context, w Worker) error {
-	if _, err := c.etcd.Put(ctx, c.workerID(w.ID()), w.Addr()); err != nil {
+	c.once.Do(func() {
+		go func() {
+			ticker := time.NewTicker(time.Second * time.Duration(bumpRegisterTTL))
+
+			for {
+				select {
+				case <-ticker.C:
+					workerResp, err := c.etcd.Get(context.Background(), c.workerID(w.ID()))
+					if err != nil {
+						continue
+					}
+					if workerResp == nil || len(workerResp.Kvs) == 0 {
+						continue
+					}
+
+					c.etcd.KeepAlive(context.Background(), clientv3.LeaseID(workerResp.Kvs[0].Lease))
+				}
+			}
+		}()
+	})
+
+	lease, err := c.etcd.Grant(context.TODO(), registerTTL)
+	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func (c *etcdCluster) Unregister(ctx context.Context, w Worker) error {
-	if _, err := c.etcd.Delete(ctx, c.workerID(w.ID())); err != nil {
+	if _, err := c.etcd.Put(ctx, c.workerID(w.ID()), w.Addr(), clientv3.WithLease(lease.ID)); err != nil {
 		return err
 	}
 
@@ -87,10 +115,6 @@ func (c *etcdCluster) Watch(f func(EventType)) error {
 	return nil
 }
 
-func (c *etcdCluster) workerID(id string) string {
-	return fmt.Sprintf("%s%s", PrefixKeyWorker, id)
-}
-
 func (c *etcdCluster) WorkerAddr() (id, host string, err error) {
 	workerID := util.RandomString(10)
 	// TODO: attach another port if already exists
@@ -112,4 +136,8 @@ func (c *etcdCluster) WorkerAddr() (id, host string, err error) {
 
 func (c *etcdCluster) Type() ClusterType {
 	return ClusterTypeETCD
+}
+
+func (c *etcdCluster) workerID(id string) string {
+	return fmt.Sprintf("%s%s", PrefixKeyWorker, id)
 }

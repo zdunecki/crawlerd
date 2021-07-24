@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"crawlerd/crawlerdpb"
+	"crawlerd/pkg/apikit/pkg/scheduler"
 	"crawlerd/pkg/storage"
 	"crawlerd/pkg/storage/objects"
 	log "github.com/sirupsen/logrus"
@@ -59,11 +60,13 @@ func (c *controller) ReAttachResources(urlC chan objects.CrawlURL) {
 				return
 			}
 
+			// TODO: retry
 			if _, err := c.scheduler.AddURL(context.Background(), &crawlerdpb.RequestURL{
 				Id:       crawl.Id,
 				Url:      crawl.Url,
 				Interval: crawl.Interval,
-			}); err != nil {
+				Lease:    true,
+			}); err != nil && err != scheduler.ErrNoWorkers {
 				c.log.Error(err)
 			}
 

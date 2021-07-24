@@ -4,9 +4,7 @@ import (
 	"net/http"
 )
 
-type Router interface {
-	ServeHTTP(http.ResponseWriter, *http.Request)
-
+type RouteMethods interface {
 	Get(string, http.HandlerFunc)
 	Put(string, http.HandlerFunc)
 	Post(string, http.HandlerFunc)
@@ -14,7 +12,13 @@ type Router interface {
 	Delete(string, http.HandlerFunc)
 }
 
-type Api interface {
+type Router interface {
+	ServeHTTP(http.ResponseWriter, *http.Request)
+
+	RouteMethods
+}
+
+type API interface {
 	Handler() http.Handler
 
 	Get(string, ContextFn)
@@ -28,7 +32,7 @@ type api struct {
 	router Router
 }
 
-func New(router Router) Api {
+func New(router Router) API {
 	return &api{
 		router: router,
 	}

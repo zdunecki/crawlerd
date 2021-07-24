@@ -2,6 +2,7 @@ package options
 
 import (
 	"crawlerd/pkg/storage"
+	"crawlerd/pkg/storage/cachestorage"
 	"crawlerd/pkg/storage/etcdstorage"
 	"crawlerd/pkg/storage/mgostorage"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -92,7 +93,7 @@ func (o *clientOpt) WithMongoDB(urlDBName string, urlCfg *options.ClientOptions)
 	}
 }
 
-func (o *clientOpt) WithETCD(registryCfg clientv3.Config) *RepositoryOption {
+func (o *clientOpt) WithETCD(registryCfg clientv3.Config, registryTTLBuffer int64) *RepositoryOption {
 	etcd, err := clientv3.New(registryCfg)
 	if err != nil {
 		return &RepositoryOption{
@@ -100,10 +101,21 @@ func (o *clientOpt) WithETCD(registryCfg clientv3.Config) *RepositoryOption {
 		}
 	}
 
-	etcdStorage := etcdstorage.NewStorage(etcd)
+	etcdStorage := etcdstorage.NewStorage(etcd, registryTTLBuffer)
 
 	return &RepositoryOption{
 		storage: etcdStorage,
+		options: map[string]repositoryOptFn{
+			"url":      nil,
+			"history":  nil,
+			"registry": nil,
+		},
+	}
+}
+
+func (o *clientOpt) WithCache() *RepositoryOption {
+	return &RepositoryOption{
+		storage: cachestorage.NewStorage(),
 		options: map[string]repositoryOptFn{
 			"url":      nil,
 			"history":  nil,

@@ -25,8 +25,6 @@ type WorkerMeta struct {
 
 type Cluster interface {
 	Register(ctx context.Context, w Worker) error
-	Unregister(ctx context.Context, w Worker) error
-
 	GetAll(ctx context.Context) ([]*WorkerMeta, error)
 
 	DeleteByID(ctx context.Context, id string) error
