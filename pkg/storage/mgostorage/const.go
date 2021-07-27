@@ -5,6 +5,7 @@ const (
 	DefaultDatabaseName = "crawlerd"
 
 	DefaultCollectionHistoryName  = "histories"
+	DefaultCollectionRegistryName = "registry"
 	DefaultCollectionURLName      = "urls"
 	DefaultCollectionSequenceName = "seq"
 )

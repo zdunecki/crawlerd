@@ -63,18 +63,20 @@ func main() {
 
 	var etcdEndpoints []string
 
-	if etcdAddr != "" {
-		etcdEndpoints = append(etcdEndpoints, etcdAddr)
-	} else {
-		etcdEndpoints = append(etcdEndpoints, etcdHost+":2379")
+	if etcd {
+		if etcdAddr != "" {
+			etcdEndpoints = append(etcdEndpoints, etcdAddr)
+		} else {
+			etcdEndpoints = append(etcdEndpoints, etcdHost+":2379")
+		}
 	}
-
-	cfg := worker.InitConfig()
 
 	etcdConfig := clientv3.Config{
 		Endpoints:   etcdEndpoints,
 		DialTimeout: time.Second * 15,
 	}
+
+	cfg := worker.InitConfig()
 
 	if port != "" {
 		cfg.WorkerGRPCAddr = port
@@ -109,19 +111,27 @@ func main() {
 
 	if mongo {
 		if mongoHost == "" {
-			opts = append(opts, worker.WithStorage(
+			storageOpts := []*storageopt.RepositoryOption{
 				storageopt.Client().
-					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", "localhost"))).URL().History(),
-				storageopt.Client().
-					WithETCD(etcdConfig, registryTTLBuffer).Registry(),
-			))
+					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", "localhost"))).URL().History().Registry(),
+			}
+
+			if etcd {
+				storageOpts = append(storageOpts, storageopt.Client().WithETCD(etcdConfig, registryTTLBuffer).Registry())
+			}
+
+			opts = append(opts, worker.WithStorage(storageOpts...))
 		} else {
-			opts = append(opts, worker.WithStorage(
+			storageOpts := []*storageopt.RepositoryOption{
 				storageopt.Client().
 					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort))).URL().History(),
-				storageopt.Client().
-					WithETCD(etcdConfig, registryTTLBuffer).Registry(),
-			))
+			}
+
+			if etcd {
+				storageOpts = append(storageOpts, storageopt.Client().WithETCD(etcdConfig, registryTTLBuffer).Registry())
+			}
+
+			opts = append(opts, worker.WithStorage(storageOpts...))
 		}
 	}
 

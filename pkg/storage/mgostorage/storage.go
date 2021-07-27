@@ -21,8 +21,9 @@ type Storage interface {
 type mgo struct {
 	seq *mongo.Collection
 
-	urlrepo     storage.URLRepository
-	historyrepo storage.HistoryRepository
+	urlrepo      storage.URLRepository
+	historyrepo  storage.HistoryRepository
+	registryrepo storage.RegistryRepository
 }
 
 func NewStorage(db *mongo.Database) Storage {
@@ -31,6 +32,7 @@ func NewStorage(db *mongo.Database) Storage {
 	}
 	mongodb.urlrepo = NewURLRepository(db.Collection(DefaultCollectionURLName), mongodb)
 	mongodb.historyrepo = NewHistoryRepository(db.Collection(DefaultCollectionHistoryName))
+	mongodb.registryrepo = NewRegistryRepository(db.Collection(DefaultCollectionRegistryName))
 
 	return mongodb
 }
@@ -79,7 +81,6 @@ func (m *mgo) History() storage.HistoryRepository {
 	return m.historyrepo
 }
 
-// registry is available in etcdstorage
 func (m *mgo) Registry() storage.RegistryRepository {
-	return nil
+	return m.registryrepo
 }
