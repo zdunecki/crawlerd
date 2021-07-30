@@ -6,6 +6,7 @@ require (
 	github.com/allegro/bigcache/v2 v2.2.5 // indirect
 	github.com/allegro/bigcache/v3 v3.0.0
 	github.com/andybalholm/brotli v1.0.3
+	github.com/aws/aws-lambda-go v1.25.0
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/chromedp/cdproto v0.0.0-20210526005521-9e51b9051fd0
 	github.com/chromedp/chromedp v0.7.3
@@ -29,5 +30,4 @@ require (
 	k8s.io/api v0.21.2
 	k8s.io/apimachinery v0.21.2
 	k8s.io/client-go v0.21.2
-	sigs.k8s.io/kind v0.11.1 // indirect
 )
