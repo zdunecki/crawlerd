@@ -20,6 +20,8 @@ require (
 	github.com/orlangure/gnomock v0.15.0
 	github.com/segmentio/kafka-go v0.4.16
 	github.com/sirupsen/logrus v1.8.1
+	github.com/spf13/cobra v1.0.0
+	github.com/spf13/viper v1.4.0
 	go.etcd.io/etcd/api/v3 v3.5.0-alpha.0
 	go.etcd.io/etcd/client/v3 v3.5.0-alpha.0
 	go.mongodb.org/mongo-driver v1.5.3

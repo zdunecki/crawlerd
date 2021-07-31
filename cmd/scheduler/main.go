@@ -25,9 +25,9 @@ func main() {
 		mongoHost string
 		mongoPort string
 
-		etcd     bool
-		etcdHost string // TODO: deprecated
-		etcdAddr string
+		etcdRegistry bool
+		etcdHost     string // TODO: deprecated
+		etcdAddr     string
 
 		registryTTL int64
 
@@ -45,7 +45,7 @@ func main() {
 	flag.StringVar(&mongoHost, "mongo-host", "", "mongo host")
 	flag.StringVar(&mongoPort, "mongo-port", "27017", "mongo port")
 
-	flag.BoolVar(&etcd, "etcd", true, "use etcd as a registry source")
+	flag.BoolVar(&etcdRegistry, "etcd-registry", false, "use etcd as a registry source")
 	flag.StringVar(&etcdHost, "etcd-host", "", "etcd host")
 	flag.StringVar(&etcdAddr, "etcd-addr", "", "etcd address")
 
@@ -81,22 +81,23 @@ func main() {
 		if mongoHost == "" {
 			storageOpts := []*storageopt.RepositoryOption{
 				storageopt.Client().
-					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", "localhost"))).URL().History(),
+					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", "localhost"))).URL().History().Registry(),
 			}
 
-			storageOpts = append(storageOpts, storageopt.Client().
-				WithETCD(etcdConfig, registryTTL).Registry())
+			if etcdRegistry {
+				storageOpts = append(storageOpts, storageopt.Client().WithETCD(etcdConfig, registryTTL).Registry())
+			}
 
 			opts = append(opts, scheduler.WithStorage(storageOpts...))
-
 		} else {
 			storageOpts := []*storageopt.RepositoryOption{
 				storageopt.Client().
-					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort))).URL().History(),
+					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort))).URL().History().Registry(),
 			}
 
-			storageOpts = append(storageOpts, storageopt.Client().
-				WithETCD(etcdConfig, registryTTL).Registry())
+			if etcdRegistry {
+				storageOpts = append(storageOpts, storageopt.Client().WithETCD(etcdConfig, registryTTL).Registry())
+			}
 
 			opts = append(opts, scheduler.WithStorage(storageOpts...))
 		}
@@ -122,7 +123,7 @@ func main() {
 				scheduler.NewWatcherOption().WithK8s(clientset, k8sNamespace, k8sWorkerSelector),
 			),
 		)
-	} else if etcd {
+	} else {
 		if etcdHost == "" {
 			opts = append(opts, scheduler.WithWatcher())
 		} else {

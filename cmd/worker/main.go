@@ -26,9 +26,9 @@ func main() {
 		mongoHost string
 		mongoPort string
 
-		etcd     bool
-		etcdHost string // TODO: deprecated
-		etcdAddr string
+		etcdRegistry bool
+		etcdHost     string // TODO: deprecated
+		etcdAddr     string
 
 		schedulerAddr string
 
@@ -46,7 +46,7 @@ func main() {
 	flag.StringVar(&mongoHost, "mongo-host", "", "mongo host")
 	flag.StringVar(&mongoPort, "mongo-port", "27017", "mongo port")
 
-	flag.BoolVar(&etcd, "etcd", true, "use etcd as a registry source")
+	flag.BoolVar(&etcdRegistry, "etcd-registry", false, "use etcd as a registry source")
 	flag.StringVar(&etcdHost, "etcd-host", "", "etcd host")
 	flag.StringVar(&etcdAddr, "etcd-addr", "", "etcd address")
 
@@ -63,7 +63,7 @@ func main() {
 
 	var etcdEndpoints []string
 
-	if etcd {
+	if etcdRegistry {
 		if etcdAddr != "" {
 			etcdEndpoints = append(etcdEndpoints, etcdAddr)
 		} else {
@@ -97,7 +97,7 @@ func main() {
 		}
 
 		opts = append(opts, worker.WithK8sCluster(clientset, k8sNamespace, k8sWorkerSelector))
-	} else if etcd {
+	} else if etcdRegistry {
 		if etcdHost == "" {
 			opts = append(opts, worker.WithETCDCluster())
 		} else {
@@ -116,7 +116,7 @@ func main() {
 					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", "localhost"))).URL().History().Registry(),
 			}
 
-			if etcd {
+			if etcdRegistry {
 				storageOpts = append(storageOpts, storageopt.Client().WithETCD(etcdConfig, registryTTLBuffer).Registry())
 			}
 
@@ -127,7 +127,7 @@ func main() {
 					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort))).URL().History(),
 			}
 
-			if etcd {
+			if etcdRegistry {
 				storageOpts = append(storageOpts, storageopt.Client().WithETCD(etcdConfig, registryTTLBuffer).Registry())
 			}
 
