@@ -7,14 +7,15 @@ require (
 	github.com/allegro/bigcache/v3 v3.0.0
 	github.com/andybalholm/brotli v1.0.3
 	github.com/aws/aws-lambda-go v1.25.0
+	github.com/aws/aws-sdk-go v1.38.64
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/chromedp/cdproto v0.0.0-20210526005521-9e51b9051fd0
 	github.com/chromedp/chromedp v0.7.3
+	github.com/evanw/esbuild v0.12.17
 	github.com/go-chi/chi/v5 v5.0.2
 	github.com/google/go-cmp v0.5.5
 	github.com/gorilla/schema v1.2.0
 	github.com/json-iterator/go v1.1.10
-	github.com/klauspost/compress v1.12.2 // indirect
 	github.com/nats-io/nats-server/v2 v2.2.3
 	github.com/nats-io/nats.go v1.11.0
 	github.com/orlangure/gnomock v0.15.0
@@ -25,6 +26,7 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.0-alpha.0
 	go.etcd.io/etcd/client/v3 v3.5.0-alpha.0
 	go.mongodb.org/mongo-driver v1.5.3
+	gocloud.dev v0.23.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	google.golang.org/grpc v1.38.0

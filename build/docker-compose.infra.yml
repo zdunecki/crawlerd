@@ -25,5 +25,27 @@ services:
     networks:
       - infra
 
+  storage:
+    image: minio/minio:RELEASE.2021-07-30T00-02-00Z
+    command: server /data --console-address ":9001"
+    expose:
+      - "9000"
+      - "9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: crawlerd
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - storage:/data
+    networks:
+      - infra
+
 networks:
   infra:
+
+volumes:
+  storage:

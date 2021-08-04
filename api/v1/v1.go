@@ -4,23 +4,30 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"crawlerd/api"
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/storage"
 	"crawlerd/pkg/storage/objects"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/cenkalti/backoff/v3"
+	esbuild "github.com/evanw/esbuild/pkg/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"gocloud.dev/blob"
+	"gocloud.dev/blob/s3blob"
 )
 
 const (
@@ -58,7 +65,15 @@ func createDirIfNotExists(target string) error {
 	return nil
 }
 
-func Untar(dst string, r io.Reader) error {
+// i.e {"path-to-file-1": "content", "path-to-file-2": "content2"}`
+
+type VirtualFiles map[string][]byte
+
+// i.e `"folder": {"path-to-file-1": "content", "path-to-file-2": "content2"}`
+
+type VirtualFilePath map[string]VirtualFiles
+
+func Unpack(bucket *blob.Bucket, dstDir string, r io.Reader) error {
 	gzr, err := gzip.NewReader(r)
 	if err != nil {
 		return err
@@ -68,7 +83,45 @@ func Untar(dst string, r io.Reader) error {
 	tr := tar.NewReader(gzr)
 
 	configFiles := make(map[string]*viper.Viper)
-	content2 := make(map[string]map[string][]byte)
+
+	content2 := make(VirtualFilePath)
+
+	// TODO: not in defer
+	// TODO: delete dstDir after bundle
+	// TODO: send bundle file to storage
+	// TODO: error handling
+	// TODO: parse env i.e $TOKEN in config files
+
+	defer func() {
+		for _, cfg := range configFiles {
+			jobID := cfg.GetString("job_id")
+			entry := cfg.GetString("entry")
+
+			if jobID == "" { // omit root
+				continue
+			}
+
+			if entry == "" {
+				entry = "index.js" // TODO: index.ts
+			}
+
+			// TODO: build in-memory instead of fs
+			result := esbuild.Build(esbuild.BuildOptions{
+				EntryPoints: []string{path.Join(dstDir, jobID, entry)},
+				Outfile:     path.Join(dstDir, jobID, "output.js"),
+				Bundle:      true,
+				Write:       true,
+				LogLevel:    esbuild.LogLevelInfo,
+			})
+
+			if len(result.Errors) > 0 {
+				log.Error(result.Errors)
+			}
+		}
+
+	}()
+
+	//filesPerJob := make(map[string]*BuildPath)
 
 	for {
 		header, err := tr.Next()
@@ -77,10 +130,10 @@ func Untar(dst string, r io.Reader) error {
 
 		// if no more files are found return
 		case err == io.EOF:
-			for dir, _ := range content2 {
-				findConfig := func() *viper.Viper {
+			for dir, fileMap := range content2 {
+				findConfig := func() (*viper.Viper, string) {
 					if _, ok := configFiles[dir]; ok {
-						return configFiles[dir]
+						return configFiles[dir], dir
 					} else {
 						movementDir := dir
 
@@ -88,31 +141,55 @@ func Untar(dst string, r io.Reader) error {
 							if movementDir == "" || movementDir == "." {
 								break
 							}
-							movementDir = filepath.Join(movementDir, "../")
+							movementDir = filepath.Join(movementDir, "../") + "/"
 							if _, ok := configFiles[movementDir]; ok {
-								return configFiles[movementDir]
+								return configFiles[movementDir], movementDir
 							}
 						}
 					}
 
-					return nil
+					return nil, ""
 				}
 
-				cfg := findConfig()
+				cfg, _ := findConfig()
 
 				if cfg == nil {
 					continue
 				}
 				jobID := cfg.GetString("job_id")
-				entry := cfg.GetString("entry")
-
-				fmt.Println(jobID, entry)
+				//entry := cfg.GetString("entry")
 
 				// TODO: insert files to API based on config
-				//
-				//for filePath, fileB := range fileMap {
-				//
-				//}
+				// TODO: bundle files per job
+				for filePath, fileB := range fileMap {
+					//filesPerJob[jobID].Paths[dir][filePath] = fileB
+					if err := bucket.WriteAll(context.TODO(), filePath, fileB, nil); err != nil {
+						log.Error(err)
+					}
+
+					_, closestConfigPath := findConfig()
+
+					// root out is in closest config level
+					targetFile := filepath.Join(dstDir, jobID, strings.ReplaceAll(filePath, closestConfigPath, ""))
+					targetDir, _ := path.Split(targetFile)
+					if err := createDirIfNotExists(targetDir); err != nil {
+						log.Error(err)
+						continue
+					}
+
+					f, err := os.Create(targetFile)
+					if err != nil {
+						log.Error(err)
+						continue
+					}
+					f.Close()
+
+					if _, err := io.Copy(f, bytes.NewReader(fileB)); err != nil {
+						log.Error(err)
+						continue
+					}
+
+				}
 			}
 			return nil
 
@@ -126,7 +203,7 @@ func Untar(dst string, r io.Reader) error {
 		}
 
 		// the target location where the dir/file should be created
-		target := filepath.Join(dst, header.Name)
+		//target := filepath.Join(dst, header.Name)
 		targetDir, targetFile := path.Split(header.Name)
 
 		// TODO: support json etc.
@@ -148,45 +225,18 @@ func Untar(dst string, r io.Reader) error {
 		// check the file type
 		switch header.Typeflag {
 
-		// if its a dir and it doesn't exist create it
 		case tar.TypeDir:
-			if err := createDirIfNotExists(target); err != nil {
-				return err
-			}
 
-		// if it's a file create it
 		case tar.TypeReg:
-			//f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
-			dir, _ := path.Split(target)
-
-			if err := createDirIfNotExists(dir); err != nil {
-				return err
-			}
-
-			f, err := os.Create(target)
-			if err != nil {
-				return err
-			}
-
 			b, err := ioutil.ReadAll(tr)
 			if err != nil {
 				return err
 			}
 
-			if _, ok := content2[targetDir]; ok {
-				content2[targetDir][header.Name] = b
-			} else {
+			if _, ok := content2[targetDir]; !ok {
 				content2[targetDir] = make(map[string][]byte)
 			}
-
-			// copy over contents
-			if _, err := io.Copy(f, tr); err != nil {
-				return err
-			}
-
-			// manually close here after each file operation; defering would cause each file close
-			// to wait until all operations have completed.
-			f.Close()
+			content2[targetDir][header.Name] = b
 		}
 	}
 }
@@ -222,6 +272,25 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 	if v.scheduler == nil {
 		return ErrNoScheduler
+	}
+
+	// TODO: storage abstraction
+	sess, err := session.NewSession(&aws.Config{
+		Credentials:      credentials.NewStaticCredentials("7E17SM0N1X3C7VTNPVV4", "NY2DH3G5W0Zn8Pdkp7W+IiR3oyYxLcRRqF1MNYW+", ""),
+		Endpoint:         aws.String("http://172.22.0.2:9000"),
+		DisableSSL:       aws.Bool(true),
+		S3ForcePathStyle: aws.Bool(true),
+		Region:           aws.String("us-east-1"),
+	})
+	if err != nil {
+		v.log.Error(err)
+		return err
+	}
+
+	bucket, err := s3blob.OpenBucket(context.TODO(), sess, "crawlerd", nil)
+	if err != nil {
+		v.log.Error(err)
+		return err
 	}
 
 	v1.Post("/api/urls", func(ctx api.Context) {
@@ -419,7 +488,8 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			return
 		}
 
-		err = Untar(path.Join(wd, "OUTPUT"), ctx.Request().Body)
+		err = Unpack(bucket, path.Join(wd, "OUTPUT"), ctx.Request().Body)
+		//err = Unpack(bucket, ctx.Request().Body)
 		if err != nil {
 			v.log.Error(err)
 			ctx.InternalError().JSON("something went wrong")
