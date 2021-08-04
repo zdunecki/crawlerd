@@ -3,8 +3,8 @@ package mgostorage
 import (
 	"context"
 
+	"crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -24,6 +24,7 @@ type mgo struct {
 	urlrepo      storage.URLRepository
 	historyrepo  storage.HistoryRepository
 	registryrepo storage.RegistryRepository
+	jobrepo      storage.JobRepository
 }
 
 func NewStorage(db *mongo.Database) Storage {
@@ -33,12 +34,13 @@ func NewStorage(db *mongo.Database) Storage {
 	mongodb.urlrepo = NewURLRepository(db.Collection(DefaultCollectionURLName), mongodb)
 	mongodb.historyrepo = NewHistoryRepository(db.Collection(DefaultCollectionHistoryName))
 	mongodb.registryrepo = NewRegistryRepository(db.Collection(DefaultCollectionRegistryName))
+	mongodb.jobrepo = NewJobRepository(db.Collection(DefaultCollectionJobName))
 
 	return mongodb
 }
 
 func (m *mgo) InsertedID(name string) (int, error) {
-	var seq objects.Sequence
+	var seq v1.Sequence
 
 	updateSeq := m.seq.FindOneAndUpdate(
 		context.Background(),
@@ -83,4 +85,8 @@ func (m *mgo) History() storage.HistoryRepository {
 
 func (m *mgo) Registry() storage.RegistryRepository {
 	return m.registryrepo
+}
+
+func (m *mgo) Job() storage.JobRepository {
+	return m.jobrepo
 }

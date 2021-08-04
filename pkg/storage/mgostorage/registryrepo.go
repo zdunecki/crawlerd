@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -16,7 +16,7 @@ const minuteTTL = 60
 const defaultTTLBuffer = 1 * minuteTTL
 
 type mgoURL struct {
-	objects.CrawlURL
+	v1.CrawlURL
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -31,7 +31,7 @@ func NewRegistryRepository(coll *mongo.Collection) storage.RegistryRepository {
 	}
 }
 
-func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, error) {
+func (r *registry) GetURLByID(ctx context.Context, id int) (*v1.CrawlURL, error) {
 	resp := r.coll.FindOne(ctx, bson.M{
 		"id": id,
 	})
@@ -51,7 +51,7 @@ func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, e
 
 // TODO: ttl should be from paramter not directly in storage
 // TODO: lease ttl bump
-func (r *registry) PutURL(ctx context.Context, url objects.CrawlURL) error {
+func (r *registry) PutURL(ctx context.Context, url v1.CrawlURL) error {
 	{
 		ttlIndex := mongo.IndexModel{Keys: bson.M{"created_at": 1}, Options: options.Index().SetExpireAfterSeconds(defaultTTLBuffer)}
 		_, err := r.coll.Indexes().CreateOne(ctx, ttlIndex)
@@ -80,7 +80,7 @@ func (r *registry) PutURL(ctx context.Context, url objects.CrawlURL) error {
 	return nil
 }
 
-func (r *registry) DeleteURL(ctx context.Context, url objects.CrawlURL) error {
+func (r *registry) DeleteURL(ctx context.Context, url v1.CrawlURL) error {
 	_, err := r.coll.DeleteOne(ctx, bson.M{
 		"id": url.Id,
 	})

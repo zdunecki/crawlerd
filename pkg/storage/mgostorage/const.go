@@ -7,5 +7,6 @@ const (
 	DefaultCollectionHistoryName  = "histories"
 	DefaultCollectionRegistryName = "registry"
 	DefaultCollectionURLName      = "urls"
+	DefaultCollectionJobName      = "jobs"
 	DefaultCollectionSequenceName = "seq"
 )

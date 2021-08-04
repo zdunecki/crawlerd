@@ -8,7 +8,7 @@ import (
 	"time"
 
 	v1 "crawlerd/api/v1"
-	"crawlerd/pkg/storage/objects"
+	metav1 "crawlerd/pkg/meta/v1"
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -42,8 +42,8 @@ func (h *httpURL) Delete(id string) error {
 }
 
 // TODO: scroll
-func (h *httpURL) All() ([]*objects.URL, error) {
-	resp := make([]*objects.URL, 0)
+func (h *httpURL) All() ([]*metav1.URL, error) {
+	resp := make([]*metav1.URL, 0)
 
 	if err := h.get("", &resp); err != nil {
 		return nil, err
@@ -57,8 +57,8 @@ func (h *httpURL) All() ([]*objects.URL, error) {
 }
 
 // TODO: scroll
-func (h *httpURL) History(urlID string) ([]*objects.History, error) {
-	resp := make([]*objects.History, 0)
+func (h *httpURL) History(urlID string) ([]*metav1.History, error) {
+	resp := make([]*metav1.History, 0)
 
 	if err := h.get(fmt.Sprintf("/%s/history", urlID), &resp); err != nil {
 		return nil, err

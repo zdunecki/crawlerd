@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
+	"crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"
 )
@@ -109,11 +109,11 @@ func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 		}()
 
 		// TODO: consider better solution than scrolling whole urls
-		if err := w.url.Scroll(context.Background(), func(urls []objects.URL) {
+		if err := w.url.Scroll(context.Background(), func(urls []v1.URL) {
 			w.log.Debugf("found url's candidates to start crawl, len=%d", len(urls))
 
 			for _, url := range urls {
-				go func(url objects.URL) {
+				go func(url v1.URL) {
 					resp, err := w.registry.GetURLByID(context.Background(), url.ID)
 
 					if err != nil {

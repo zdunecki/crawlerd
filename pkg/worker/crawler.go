@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
+	metav1 "crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	"crawlerd/pkg/util"
 	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
@@ -31,19 +31,19 @@ const (
 
 type (
 	QueueInterval int64
-	CrawlerStopCB func(chan objects.CrawlURL)
+	CrawlerStopCB func(chan metav1.CrawlURL)
 )
 
 type Crawler interface {
-	Enqueue(objects.CrawlURL)
-	Update(objects.CrawlURL)
+	Enqueue(metav1.CrawlURL)
+	Update(metav1.CrawlURL)
 	Dequeue(int64)
 
 	Stop(CrawlerStopCB)
 
-	newIntervalQue(crawlURL objects.CrawlURL)
+	newIntervalQue(crawlURL metav1.CrawlURL)
 	crawl(*time.Ticker, QueueInterval)
-	fetchContent(crawl objects.CrawlURL) error
+	fetchContent(crawl metav1.CrawlURL) error
 	httpRequest(string) (*http.Response, error)
 }
 
@@ -64,8 +64,8 @@ type crawler struct {
 
 	stopC       map[QueueInterval]chan bool
 	ticker      map[QueueInterval]*time.Ticker
-	queueC      map[QueueInterval]chan objects.CrawlURL
-	closeQueueC chan objects.CrawlURL
+	queueC      map[QueueInterval]chan metav1.CrawlURL
+	closeQueueC chan metav1.CrawlURL
 
 	log *log.Entry
 }
@@ -86,8 +86,8 @@ func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub, co
 
 		stopC:       make(map[QueueInterval]chan bool),
 		ticker:      make(map[QueueInterval]*time.Ticker),
-		queueC:      make(map[QueueInterval]chan objects.CrawlURL),
-		closeQueueC: make(chan objects.CrawlURL, DefaultQueueLength),
+		queueC:      make(map[QueueInterval]chan metav1.CrawlURL),
+		closeQueueC: make(chan metav1.CrawlURL, DefaultQueueLength),
 
 		log: log.WithFields(map[string]interface{}{
 			"service": "crawler",
@@ -109,13 +109,13 @@ func (c *crawler) Dequeue(id int64) {
 	}
 }
 
-func (c *crawler) Update(crawlURL objects.CrawlURL) {
+func (c *crawler) Update(crawlURL metav1.CrawlURL) {
 	if err := c.registry.PutURL(context.Background(), crawlURL); err != nil {
 		c.log.Error(err)
 	}
 }
 
-func (c *crawler) Enqueue(crawlURL objects.CrawlURL) {
+func (c *crawler) Enqueue(crawlURL metav1.CrawlURL) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -157,16 +157,16 @@ func (c *crawler) Stop(cb CrawlerStopCB) {
 	cb(c.closeQueueC)
 }
 
-func (c *crawler) newIntervalQue(crawlURL objects.CrawlURL) {
+func (c *crawler) newIntervalQue(crawlURL metav1.CrawlURL) {
 	intervalID := QueueInterval(crawlURL.Interval)
 
 	ticker := time.NewTicker(time.Second * time.Duration(crawlURL.Interval))
 	c.stopC[intervalID] = make(chan bool)
 	c.ticker[intervalID] = ticker
-	c.queueC[intervalID] = make(chan objects.CrawlURL, DefaultQueueLength)
+	c.queueC[intervalID] = make(chan metav1.CrawlURL, DefaultQueueLength)
 	c.queueC[intervalID] <- crawlURL
 
-	if err := c.registry.PutURL(context.Background(), objects.CrawlURL{
+	if err := c.registry.PutURL(context.Background(), metav1.CrawlURL{
 		Id:       crawlURL.Id,
 		Url:      crawlURL.Url,
 		Interval: crawlURL.Interval,
@@ -175,7 +175,7 @@ func (c *crawler) newIntervalQue(crawlURL objects.CrawlURL) {
 		return
 	}
 
-	go func(crawlURL objects.CrawlURL) {
+	go func(crawlURL metav1.CrawlURL) {
 		if err := c.fetchContent(crawlURL); err != nil {
 			c.log.Error(err)
 		}
@@ -270,7 +270,7 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 
 					if !queueExists {
 						c.log.Debug("create new channel for queue")
-						c.queueC[newInterval] = make(chan objects.CrawlURL, DefaultQueueLength)
+						c.queueC[newInterval] = make(chan metav1.CrawlURL, DefaultQueueLength)
 
 						newTick := time.NewTicker(time.Second * time.Duration(newInterval))
 						go c.crawl(newTick, newInterval)
@@ -288,7 +288,7 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 }
 
 // TODO: gridfs vs ioutil.ReadAll
-func (c *crawler) fetchContent(crawl objects.CrawlURL) error {
+func (c *crawler) fetchContent(crawl metav1.CrawlURL) error {
 	c.log.Debug("trying fetch content")
 
 	start := time.Now()

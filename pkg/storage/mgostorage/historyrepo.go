@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -39,7 +39,7 @@ func (h *historyrepo) InsertOne(ctx context.Context, id int, response []byte, du
 	return true, id, nil
 }
 
-func (h *historyrepo) FindByID(ctx context.Context, id int) ([]objects.History, error) {
+func (h *historyrepo) FindByID(ctx context.Context, id int) ([]v1.History, error) {
 	cursor, err := h.coll.Find(ctx, bson.M{
 		"id": id,
 	})
@@ -49,16 +49,16 @@ func (h *historyrepo) FindByID(ctx context.Context, id int) ([]objects.History, 
 
 	defer cursor.Close(ctx)
 
-	var histories []objects.History
+	var histories []v1.History
 
 	for cursor.Next(ctx) {
-		var historyDocument objects.History
+		var historyDocument v1.History
 
 		if err := cursor.Decode(&historyDocument); err != nil {
 			return nil, err
 		}
 
-		histories = append(histories, objects.History{
+		histories = append(histories, v1.History{
 			Response:        historyDocument.Response,
 			CreatedAt:       historyDocument.CreatedAt,
 			DurationSeconds: historyDocument.DurationSeconds,

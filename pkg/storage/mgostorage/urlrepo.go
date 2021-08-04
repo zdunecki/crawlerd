@@ -3,8 +3,8 @@ package mgostorage
 import (
 	"context"
 
+	"crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -28,11 +28,11 @@ func NewURLRepository(coll *mongo.Collection, client Storage) storage.URLReposit
 	}
 }
 
-func (u *urlrepo) FindOne(ctx context.Context) (objects.URL, error) {
+func (u *urlrepo) FindOne(ctx context.Context) (v1.URL, error) {
 	panic("implement me")
 }
 
-func (u *urlrepo) FindAll(ctx context.Context) ([]objects.URL, error) {
+func (u *urlrepo) FindAll(ctx context.Context) ([]v1.URL, error) {
 	cursor, err := u.coll.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
@@ -40,11 +40,11 @@ func (u *urlrepo) FindAll(ctx context.Context) ([]objects.URL, error) {
 
 	defer cursor.Close(ctx)
 
-	var urls []objects.URL
+	var urls []v1.URL
 
 	for cursor.Next(ctx) {
 
-		var responseURL objects.URL
+		var responseURL v1.URL
 
 		if err := cursor.Decode(&responseURL); err != nil {
 			return nil, err
@@ -56,7 +56,7 @@ func (u *urlrepo) FindAll(ctx context.Context) ([]objects.URL, error) {
 	return urls, nil
 }
 
-func (u *urlrepo) FindAllByWorkerID(ctx context.Context) ([]objects.URL, error) {
+func (u *urlrepo) FindAllByWorkerID(ctx context.Context) ([]v1.URL, error) {
 	panic("implement me")
 }
 
@@ -122,7 +122,7 @@ func (u *urlrepo) DeleteOneByID(ctx context.Context, id int) (bool, error) {
 }
 
 // TODO: tests
-func (u *urlrepo) Scroll(ctx context.Context, f func([]objects.URL)) error {
+func (u *urlrepo) Scroll(ctx context.Context, f func([]v1.URL)) error {
 	cursor, err := u.coll.Find(ctx, bson.M{})
 	if err != nil {
 		return err
@@ -130,10 +130,10 @@ func (u *urlrepo) Scroll(ctx context.Context, f func([]objects.URL)) error {
 
 	i := 1
 
-	var urls []objects.URL
+	var urls []v1.URL
 
 	for cursor.Next(ctx) {
-		var url objects.URL
+		var url v1.URL
 
 		if err := cursor.Decode(&url); err != nil {
 			return err

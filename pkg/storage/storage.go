@@ -4,38 +4,51 @@ import (
 	"context"
 	"time"
 
-	"crawlerd/pkg/storage/objects"
+	metav1 "crawlerd/pkg/meta/v1"
 )
+
+// TODO: aliases - needed for multi-tenant in same collection
 
 // TODO: better name
 type URLRepository interface {
-	Scroll(context.Context, func([]objects.URL)) error
+	Scroll(context.Context, func([]metav1.URL)) error
 
-	FindOne(context.Context) (objects.URL, error)
-	FindAll(context.Context) ([]objects.URL, error)
-	FindAllByWorkerID(context.Context) ([]objects.URL, error)
+	FindOne(context.Context) (metav1.URL, error)
+	FindAll(context.Context) ([]metav1.URL, error)
+	FindAllByWorkerID(context.Context) ([]metav1.URL, error)
 
 	InsertOne(ctx context.Context, url string, interval int) (bool, int, error)
 
+	// TODO: replace update interface{} with some metav1 struct
 	UpdateOneByID(ctx context.Context, id int, update interface{}) (bool, error)
 
 	DeleteOneByID(ctx context.Context, id int) (bool, error)
 }
 
 type HistoryRepository interface {
-	FindByID(ctx context.Context, id int) ([]objects.History, error)
+	FindByID(ctx context.Context, id int) ([]metav1.History, error)
 	InsertOne(ctx context.Context, id int, response []byte, duration time.Duration, createdAt time.Time) (bool, int, error)
 }
 
 type RegistryRepository interface {
-	GetURLByID(context.Context, int) (*objects.CrawlURL, error)
-	PutURL(context.Context, objects.CrawlURL) error
-	DeleteURL(context.Context, objects.CrawlURL) error
+	GetURLByID(context.Context, int) (*metav1.CrawlURL, error)
+	PutURL(context.Context, metav1.CrawlURL) error
+	DeleteURL(context.Context, metav1.CrawlURL) error
 	DeleteURLByID(context.Context, int) error
+}
+
+type JobRepository interface {
+	FindOneByID(context.Context, string) (*metav1.Job, error)
+	FindAll(context.Context) ([]metav1.Job, error)
+
+	InsertOne(context.Context, *metav1.JobCreate) error
+
+	PatchOneByID(ctx context.Context, id string, job *metav1.JobPatch) error
 }
 
 type Storage interface {
 	URL() URLRepository
 	History() HistoryRepository
 	Registry() RegistryRepository
+	Job() JobRepository
 }

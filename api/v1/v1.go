@@ -17,8 +17,8 @@ import (
 
 	"crawlerd/api"
 	"crawlerd/crawlerdpb"
+	metav1 "crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -38,8 +38,8 @@ type V1URL interface {
 	Create(*RequestPostURL) (*ResponsePostURL, error)
 	Patch(id string, data *RequestPatchURL) (*ResponsePostURL, error)
 	Delete(id string) error
-	All() ([]*objects.URL, error)
-	History(urlID string) ([]*objects.History, error)
+	All() ([]*metav1.URL, error)
+	History(urlID string) ([]*metav1.History, error)
 }
 
 type V1 interface {
@@ -449,7 +449,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		}
 
 		if urls == nil {
-			urls = []objects.URL{}
+			urls = []metav1.URL{}
 		}
 
 		ctx.JSON(urls)
@@ -471,7 +471,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		}
 
 		if history == nil {
-			history = []objects.History{}
+			history = []metav1.History{}
 		}
 
 		ctx.JSON(history)
@@ -496,7 +496,87 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			return
 		}
 
-		ctx.JSON("abc")
+		ctx.JSON("ok")
+	})
+
+	v1.Post("/v1/jobs", func(c api.Context) {
+		req := &metav1.JobCreate{}
+
+		if err := c.Bind(req); err != nil {
+			v.log.Error(err)
+			c.InternalError().JSON("something went wrong")
+			return
+		}
+
+		if err := req.Validate(); err != nil {
+			v.log.Error(err)
+			c.InternalError().JSON("validation error")
+			return
+		}
+
+		if err := v.storage.Job().InsertOne(context.TODO(), req); err != nil {
+			v.log.Error(err)
+			c.InternalError().JSON("something went wrong")
+			return
+		}
+
+		c.JSON("ok")
+	})
+
+	v1.Get("/v1/jobs", func(c api.Context) {
+		if jobs, err := v.storage.Job().FindAll(context.TODO()); err != nil {
+			v.log.Error(err)
+			c.InternalError().JSON("something went wrong")
+			return
+		} else {
+			c.JSON(jobs)
+		}
+	})
+
+	v1.Get("/v1/jobs/{id}", func(c api.Context) {
+		id := c.Param("id")
+
+		if job, err := v.storage.Job().FindOneByID(context.TODO(), id); err != nil {
+			v.log.Error(err)
+			c.InternalError().JSON("something went wrong")
+			return
+		} else {
+			c.JSON(job)
+		}
+	})
+
+	v1.Patch("/v1/jobs/{id}", func(c api.Context) {
+		req := &metav1.JobPatch{}
+
+		if err := c.Bind(req); err != nil {
+			v.log.Error(err)
+			c.InternalError().JSON("something went wrong")
+			return
+		}
+
+		id := c.Param("id")
+
+		if job, err := v.storage.Job().FindOneByID(context.TODO(), id); err != nil {
+			v.log.Error(err)
+			c.InternalError().JSON("something went wrong")
+			return
+		} else {
+			req.ApplyJob(job)
+
+			if err := req.Validate(); err != nil {
+				v.log.Error(err)
+				c.InternalError().JSON("validation error")
+				return
+			}
+		}
+
+		if err := v.storage.Job().PatchOneByID(context.TODO(), id, req); err != nil {
+			v.log.Error(err)
+			c.InternalError().JSON("something went wrong")
+			return
+		}
+
+		c.JSON("ok")
 	})
 
 	v.log.Info("listening on: ", addr)

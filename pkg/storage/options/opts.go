@@ -13,6 +13,7 @@ type repositoryOpt struct {
 	url      storage.URLRepository
 	history  storage.HistoryRepository
 	registry storage.RegistryRepository
+	job      storage.JobRepository
 }
 
 func (s *repositoryOpt) URL() storage.URLRepository {
@@ -25,6 +26,10 @@ func (s *repositoryOpt) History() storage.HistoryRepository {
 
 func (s *repositoryOpt) Registry() storage.RegistryRepository {
 	return s.registry
+}
+
+func (s *repositoryOpt) Job() storage.JobRepository {
+	return s.job
 }
 
 func withURL(r storage.URLRepository) repositoryOptFn {
@@ -42,6 +47,12 @@ func withHistory(r storage.HistoryRepository) repositoryOptFn {
 func withRegistry(r storage.RegistryRepository) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.registry = r
+	}
+}
+
+func withJob(j storage.JobRepository) repositoryOptFn {
+	return func(s *repositoryOpt) {
+		s.job = j
 	}
 }
 
@@ -63,6 +74,11 @@ func (o *RepositoryOption) History() *RepositoryOption {
 }
 func (o *RepositoryOption) Registry() *RepositoryOption {
 	o.options["registry"] = withRegistry(o.storage.Registry())
+	return o
+}
+
+func (o *RepositoryOption) Job() *RepositoryOption {
+	o.options["job"] = withJob(o.storage.Job())
 	return o
 }
 
@@ -89,6 +105,7 @@ func (o *clientOpt) WithMongoDB(urlDBName string, urlCfg *options.ClientOptions)
 			"url":      nil,
 			"history":  nil,
 			"registry": nil,
+			"job":      nil,
 		},
 	}
 }
@@ -109,6 +126,7 @@ func (o *clientOpt) WithETCD(registryCfg clientv3.Config, registryTTLBuffer int6
 			"url":      nil,
 			"history":  nil,
 			"registry": nil,
+			"job":      nil,
 		},
 	}
 }
@@ -120,6 +138,7 @@ func (o *clientOpt) WithCache() *RepositoryOption {
 			"url":      nil,
 			"history":  nil,
 			"registry": nil,
+			"job":      nil,
 		},
 	}
 }
@@ -129,6 +148,7 @@ func WithStorage(opts ...*RepositoryOption) (storage.Storage, error) {
 		"url":      nil,
 		"history":  nil,
 		"registry": nil,
+		"job":      nil,
 	}
 
 	for _, opt := range opts {
@@ -147,6 +167,7 @@ func WithStorage(opts ...*RepositoryOption) (storage.Storage, error) {
 		options["url"],
 		options["history"],
 		options["registry"],
+		options["job"],
 	)
 
 	return s, nil

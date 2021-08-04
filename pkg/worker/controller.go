@@ -1,18 +1,18 @@
 package worker
 
 import (
-	context "context"
+	"context"
 	"sync"
 
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/apikit/pkg/scheduler"
+	metav1 "crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	log "github.com/sirupsen/logrus"
 )
 
 type Controller interface {
-	ReAttachResources(chan objects.CrawlURL)
+	ReAttachResources(chan metav1.CrawlURL)
 }
 
 type controller struct {
@@ -34,7 +34,7 @@ func NewController(scheduler crawlerdpb.SchedulerClient, registry storage.Regist
 }
 
 // TODO: what should do on k8s?
-func (c *controller) ReAttachResources(urlC chan objects.CrawlURL) {
+func (c *controller) ReAttachResources(urlC chan metav1.CrawlURL) {
 	c.log.Debugln("attach jobs to another workers...")
 
 	wg := sync.WaitGroup{}
@@ -48,7 +48,7 @@ func (c *controller) ReAttachResources(urlC chan objects.CrawlURL) {
 
 	i := 0
 	for crawl := range urlC {
-		func(crawl objects.CrawlURL) {
+		func(crawl metav1.CrawlURL) {
 			defer func() {
 				wg.Done()
 				i++

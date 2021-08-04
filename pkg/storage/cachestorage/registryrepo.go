@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"crawlerd/internal/cache"
+	"crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	"github.com/allegro/bigcache/v3"
 )
 
@@ -28,13 +28,13 @@ func NewRegistryRepository() storage.RegistryRepository {
 	}
 }
 
-func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, error) {
+func (r *registry) GetURLByID(ctx context.Context, id int) (*v1.CrawlURL, error) {
 	resp, err := r.cache.Get(r.crawlID(id))
 	if err != nil {
 		return nil, err
 	}
 
-	var crawlURL *objects.CrawlURL
+	var crawlURL *v1.CrawlURL
 
 	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&crawlURL); err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, e
 	return crawlURL, nil
 }
 
-func (r *registry) PutURL(ctx context.Context, url objects.CrawlURL) error {
+func (r *registry) PutURL(ctx context.Context, url v1.CrawlURL) error {
 	crawlUrlB, err := json.Marshal(url)
 	if err != nil {
 		return nil
@@ -59,7 +59,7 @@ func (r *registry) PutURL(ctx context.Context, url objects.CrawlURL) error {
 	return nil
 }
 
-func (r *registry) DeleteURL(ctx context.Context, url objects.CrawlURL) error {
+func (r *registry) DeleteURL(ctx context.Context, url v1.CrawlURL) error {
 	if err := r.cache.Del(r.crawlID(int(url.Id))); err != nil {
 		return err
 	}

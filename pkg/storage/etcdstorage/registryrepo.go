@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	fmt "fmt"
 
+	"crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/objects"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -29,7 +29,7 @@ func NewRegistryRepository(etcd *clientv3.Client, ttlBuffer int64) storage.Regis
 	}
 }
 
-func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, error) {
+func (r *registry) GetURLByID(ctx context.Context, id int) (*v1.CrawlURL, error) {
 	resp, err := r.etcd.Get(ctx, r.crawlID(id))
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, e
 		return nil, err
 	}
 
-	var crawlURL *objects.CrawlURL
+	var crawlURL *v1.CrawlURL
 
 	kv := resp.Kvs[0]
 	if err := json.NewDecoder(bytes.NewReader(kv.Value)).Decode(&crawlURL); err != nil {
@@ -58,7 +58,7 @@ func (r *registry) GetURLByID(ctx context.Context, id int) (*objects.CrawlURL, e
 
 // TODO: ttl should be from paramter not directly in storage
 // TODO: lease ttl bump
-func (r *registry) PutURL(ctx context.Context, url objects.CrawlURL) error {
+func (r *registry) PutURL(ctx context.Context, url v1.CrawlURL) error {
 	crawlUrlB, err := json.Marshal(url)
 	if err != nil {
 		return nil
@@ -84,7 +84,7 @@ func (r *registry) PutURL(ctx context.Context, url objects.CrawlURL) error {
 	return nil
 }
 
-func (r *registry) DeleteURL(ctx context.Context, url objects.CrawlURL) error {
+func (r *registry) DeleteURL(ctx context.Context, url v1.CrawlURL) error {
 	if _, err := r.etcd.Delete(ctx, r.crawlID(int(url.Id))); err != nil {
 		return err
 	}

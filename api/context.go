@@ -30,6 +30,7 @@ type Context interface {
 	Bind(interface{}) error
 	BindQuery(i interface{}) error
 
+	Param(key string) string
 	ParamInt(key string) (int, error)
 
 	JSON(interface{}) error
@@ -95,9 +96,13 @@ func (c ctx) Request() *http.Request {
 	return c.request
 }
 
+func (c ctx) Param(key string) string {
+	return chi.URLParam(c.request, key)
+}
+
 func (c ctx) ParamInt(key string) (int, error) {
-	urlID := chi.URLParam(c.request, key)
-	i, err := strconv.Atoi(urlID)
+	v := chi.URLParam(c.request, key)
+	i, err := strconv.Atoi(v)
 
 	if err != nil {
 		return 0, err

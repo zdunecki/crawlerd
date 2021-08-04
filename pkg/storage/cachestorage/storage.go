@@ -6,6 +6,10 @@ type cachestorage struct {
 	registryRepo storage.RegistryRepository
 }
 
+func (c *cachestorage) Job() storage.JobRepository {
+	panic("implement me")
+}
+
 type Storage interface {
 	storage.Storage
 }

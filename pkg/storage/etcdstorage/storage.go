@@ -9,6 +9,10 @@ type etcd struct {
 	registryRepo storage.RegistryRepository
 }
 
+func (e etcd) Job() storage.JobRepository {
+	panic("implement me")
+}
+
 type Storage interface {
 	storage.Storage
 }
