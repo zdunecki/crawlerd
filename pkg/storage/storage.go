@@ -5,6 +5,7 @@ import (
 	"time"
 
 	metav1 "crawlerd/pkg/meta/v1"
+	runnerstorage "crawlerd/pkg/runner/storage"
 )
 
 // TODO: aliases - needed for multi-tenant in same collection
@@ -41,9 +42,11 @@ type JobRepository interface {
 	FindOneByID(context.Context, string) (*metav1.Job, error)
 	FindAll(context.Context) ([]metav1.Job, error)
 
-	InsertOne(context.Context, *metav1.JobCreate) error
+	InsertOne(context.Context, *metav1.JobCreate) (string, error)
 
 	PatchOneByID(ctx context.Context, id string, job *metav1.JobPatch) error
+
+	Functions() runnerstorage.Functions
 }
 
 type Storage interface {

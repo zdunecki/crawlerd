@@ -4,6 +4,7 @@ import (
 	"context"
 
 	metav1 "crawlerd/pkg/meta/v1"
+	runnerstorage "crawlerd/pkg/runner/storage"
 	"crawlerd/pkg/storage"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -12,13 +13,18 @@ import (
 
 // TODO: logger
 type job struct {
-	coll *mongo.Collection
+	coll         *mongo.Collection
+	jobFunctions *jobFunctions
 }
 
 func NewJobRepository(coll *mongo.Collection) storage.JobRepository {
-	return &job{
+	j := &job{
 		coll: coll,
 	}
+
+	j.jobFunctions = NewJobFunctions(j)
+
+	return j
 }
 
 func (j *job) FindAll(ctx context.Context) ([]metav1.Job, error) {
@@ -60,14 +66,17 @@ func (j *job) FindOneByID(ctx context.Context, id string) (*metav1.Job, error) {
 	return &job, nil
 }
 
-func (j *job) InsertOne(ctx context.Context, job *metav1.JobCreate) error {
-	_, err := j.coll.InsertOne(ctx, job)
-
+func (j *job) InsertOne(ctx context.Context, job *metav1.JobCreate) (string, error) {
+	resp, err := j.coll.InsertOne(ctx, job)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return err
+	if oid, ok := resp.InsertedID.(primitive.ObjectID); ok {
+		return oid.Hex(), nil
+	}
+
+	return "", nil
 }
 
 func (j *job) PatchOneByID(ctx context.Context, id string, job *metav1.JobPatch) error {
@@ -80,4 +89,8 @@ func (j *job) PatchOneByID(ctx context.Context, id string, job *metav1.JobPatch)
 	}
 
 	return err
+}
+
+func (j *job) Functions() runnerstorage.Functions {
+	return j.jobFunctions
 }
