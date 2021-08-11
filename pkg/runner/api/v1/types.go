@@ -1,6 +1,6 @@
 package v1
 
 type RequestExtract struct {
-	URL    string `json:"url"`
-	JSFile string `json:"js_file"`
+	ID  string `json:"id"`
+	URL string `json:"url"`
 }

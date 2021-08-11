@@ -1,9 +1,11 @@
 package storage
 
-type Plugins interface {
-	LoadScriptByName(string) (string, error)
+import "context"
+
+type Functions interface {
+	Get(context.Context, string) (string, error)
 }
 
 type Storage interface {
-	Plugins() Plugins
+	Functions() Functions
 }

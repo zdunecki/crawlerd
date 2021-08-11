@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io/ioutil"
 	"path"
 
@@ -10,7 +11,7 @@ import (
 type pluginsRepository struct {
 }
 
-func (p *pluginsRepository) LoadScriptByName(name string) (string, error) {
+func (p *pluginsRepository) Get(c context.Context, name string) (string, error) {
 	folder := "./pkg/runner"
 
 	if b, err := ioutil.ReadFile(path.Join(folder, name)); err != nil {
@@ -30,6 +31,6 @@ func newFakeStorage() storage.Storage {
 	}
 }
 
-func (s *fakeStorage) Plugins() storage.Plugins {
+func (s *fakeStorage) Functions() storage.Functions {
 	return s.pluginsRepository
 }
