@@ -1,11 +1,11 @@
-package mgostorage
+package mgostore
 
 import (
 	"context"
 	"time"
 
 	"crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -14,7 +14,7 @@ type historyrepo struct {
 	coll *mongo.Collection
 }
 
-func NewHistoryRepository(coll *mongo.Collection) storage.HistoryRepository {
+func NewHistoryRepository(coll *mongo.Collection) store.HistoryRepository {
 	return &historyrepo{
 		coll: coll,
 	}

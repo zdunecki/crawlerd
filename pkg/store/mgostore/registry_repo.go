@@ -1,4 +1,4 @@
-package mgostorage
+package mgostore
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -25,7 +25,7 @@ type registry struct {
 	coll *mongo.Collection
 }
 
-func NewRegistryRepository(coll *mongo.Collection) storage.RegistryRepository {
+func NewRegistryRepository(coll *mongo.Collection) store.RegistryRepository {
 	return &registry{
 		coll: coll,
 	}

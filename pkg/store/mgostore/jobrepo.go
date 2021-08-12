@@ -1,11 +1,11 @@
-package mgostorage
+package mgostore
 
 import (
 	"context"
 
 	metav1 "crawlerd/pkg/meta/v1"
 	runnerstorage "crawlerd/pkg/runner/storage"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -17,7 +17,7 @@ type job struct {
 	jobFunctions *jobFunctions
 }
 
-func NewJobRepository(coll *mongo.Collection) storage.JobRepository {
+func NewJobRepository(coll *mongo.Collection) store.JobRepository {
 	j := &job{
 		coll: coll,
 	}

@@ -1,4 +1,4 @@
-package storage
+package store
 
 import (
 	"context"
@@ -10,13 +10,21 @@ import (
 
 // TODO: aliases - needed for multi-tenant in same collection
 
+type RequestQueueRepository interface {
+	InsertMany(context.Context, []*metav1.RequestQueueCreate) ([]string, error)
+}
+
+type LinkerRepository interface {
+	InsertManyIfNotExists(context.Context, []*metav1.RequestQueueCreate) ([]string, error)
+}
+
 // TODO: better name
+// Deprecated: URLRepository is now RequestQueueRepository
 type URLRepository interface {
 	Scroll(context.Context, func([]metav1.URL)) error
 
 	FindOne(context.Context) (metav1.URL, error)
 	FindAll(context.Context) ([]metav1.URL, error)
-	FindAllByWorkerID(context.Context) ([]metav1.URL, error)
 
 	InsertOne(ctx context.Context, url string, interval int) (bool, int, error)
 
@@ -28,12 +36,15 @@ type URLRepository interface {
 
 type HistoryRepository interface {
 	FindByID(ctx context.Context, id int) ([]metav1.History, error)
+
 	InsertOne(ctx context.Context, id int, response []byte, duration time.Duration, createdAt time.Time) (bool, int, error)
 }
 
 type RegistryRepository interface {
 	GetURLByID(context.Context, int) (*metav1.CrawlURL, error)
+
 	PutURL(context.Context, metav1.CrawlURL) error
+
 	DeleteURL(context.Context, metav1.CrawlURL) error
 	DeleteURLByID(context.Context, int) error
 }
@@ -50,6 +61,8 @@ type JobRepository interface {
 }
 
 type Storage interface {
+	RequestQueue() RequestQueueRepository
+	Linker() LinkerRepository
 	URL() URLRepository
 	History() HistoryRepository
 	Registry() RegistryRepository

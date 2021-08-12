@@ -1,4 +1,4 @@
-package mgostorage
+package mgostore
 
 import (
 	"context"

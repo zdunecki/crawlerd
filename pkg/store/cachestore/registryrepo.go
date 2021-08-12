@@ -1,4 +1,4 @@
-package cachestorage
+package cachestore
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 
 	"crawlerd/internal/cache"
 	"crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"github.com/allegro/bigcache/v3"
 )
 
@@ -22,7 +22,7 @@ type registry struct {
 }
 
 //TODO: finish, cache implementation from argument
-func NewRegistryRepository() storage.RegistryRepository {
+func NewRegistryRepository() store.RegistryRepository {
 	return &registry{
 		cache: cache.NewCache(bigcache.DefaultConfig(0)),
 	}

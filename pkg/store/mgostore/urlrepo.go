@@ -1,10 +1,10 @@
-package mgostorage
+package mgostore
 
 import (
 	"context"
 
 	"crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -20,7 +20,7 @@ type urlrepo struct {
 	defaultScroll int
 }
 
-func NewURLRepository(coll *mongo.Collection, client Storage) storage.URLRepository {
+func NewURLRepository(coll *mongo.Collection, client Storage) store.URLRepository {
 	return &urlrepo{
 		client:        client,
 		coll:          coll,
@@ -54,10 +54,6 @@ func (u *urlrepo) FindAll(ctx context.Context) ([]v1.URL, error) {
 	}
 
 	return urls, nil
-}
-
-func (u *urlrepo) FindAllByWorkerID(ctx context.Context) ([]v1.URL, error) {
-	panic("implement me")
 }
 
 func (u *urlrepo) InsertOne(ctx context.Context, url string, interval int) (bool, int, error) {

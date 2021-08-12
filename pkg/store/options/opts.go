@@ -1,56 +1,71 @@
 package options
 
 import (
-	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/cachestorage"
-	"crawlerd/pkg/storage/etcdstorage"
-	"crawlerd/pkg/storage/mgostorage"
+	"crawlerd/pkg/store"
+	"crawlerd/pkg/store/cachestore"
+	"crawlerd/pkg/store/etcdstore"
+	"crawlerd/pkg/store/mgostore"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type repositoryOpt struct {
-	url      storage.URLRepository
-	history  storage.HistoryRepository
-	registry storage.RegistryRepository
-	job      storage.JobRepository
+	requestQueue store.RequestQueueRepository
+	url          store.URLRepository
+	history      store.HistoryRepository
+	registry     store.RegistryRepository
+	job          store.JobRepository
 }
 
-func (s *repositoryOpt) URL() storage.URLRepository {
+func (s *repositoryOpt) Linker() store.LinkerRepository {
+	panic("implement me")
+}
+
+func (s *repositoryOpt) RequestQueue() store.RequestQueueRepository {
+	return s.requestQueue
+}
+
+func (s *repositoryOpt) URL() store.URLRepository {
 	return s.url
 }
 
-func (s *repositoryOpt) History() storage.HistoryRepository {
+func (s *repositoryOpt) History() store.HistoryRepository {
 	return s.history
 }
 
-func (s *repositoryOpt) Registry() storage.RegistryRepository {
+func (s *repositoryOpt) Registry() store.RegistryRepository {
 	return s.registry
 }
 
-func (s *repositoryOpt) Job() storage.JobRepository {
+func (s *repositoryOpt) Job() store.JobRepository {
 	return s.job
 }
 
-func withURL(r storage.URLRepository) repositoryOptFn {
+func withRequestQueue(r store.RequestQueueRepository) repositoryOptFn {
+	return func(s *repositoryOpt) {
+		s.requestQueue = r
+	}
+}
+
+func withURL(r store.URLRepository) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.url = r
 	}
 }
 
-func withHistory(r storage.HistoryRepository) repositoryOptFn {
+func withHistory(r store.HistoryRepository) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.history = r
 	}
 }
 
-func withRegistry(r storage.RegistryRepository) repositoryOptFn {
+func withRegistry(r store.RegistryRepository) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.registry = r
 	}
 }
 
-func withJob(j storage.JobRepository) repositoryOptFn {
+func withJob(j store.JobRepository) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.job = j
 	}
@@ -59,9 +74,14 @@ func withJob(j storage.JobRepository) repositoryOptFn {
 type repositoryOptFn func(*repositoryOpt)
 
 type RepositoryOption struct {
-	storage storage.Storage
+	storage store.Storage
 	options map[string]repositoryOptFn
 	err     error
+}
+
+func (o *RepositoryOption) RequestQueue() *RepositoryOption {
+	o.options["request_queue"] = withRequestQueue(o.storage.RequestQueue())
+	return o
 }
 
 func (o *RepositoryOption) URL() *RepositoryOption {
@@ -86,7 +106,7 @@ type clientOpt struct {
 }
 
 func (o *clientOpt) WithMongoDB(urlDBName string, urlCfg *options.ClientOptions) *RepositoryOption {
-	client, err := mgostorage.NewClient(urlCfg)
+	client, err := mgostore.NewClient(urlCfg)
 	if err != nil {
 		return &RepositoryOption{
 			err: err,
@@ -97,15 +117,16 @@ func (o *clientOpt) WithMongoDB(urlDBName string, urlCfg *options.ClientOptions)
 		client.SetDatabaseName(urlDBName)
 	}
 
-	s := mgostorage.NewStorage(client.DB())
+	s := mgostore.NewStore(client.DB())
 
 	return &RepositoryOption{
 		storage: s,
 		options: map[string]repositoryOptFn{
-			"url":      nil,
-			"history":  nil,
-			"registry": nil,
-			"job":      nil,
+			"request_queue": nil,
+			"url":           nil,
+			"history":       nil,
+			"registry":      nil,
+			"job":           nil,
 		},
 	}
 }
@@ -118,37 +139,40 @@ func (o *clientOpt) WithETCD(registryCfg clientv3.Config, registryTTLBuffer int6
 		}
 	}
 
-	etcdStorage := etcdstorage.NewStorage(etcd, registryTTLBuffer)
+	etcdStorage := etcdstore.NewStorage(etcd, registryTTLBuffer)
 
 	return &RepositoryOption{
 		storage: etcdStorage,
 		options: map[string]repositoryOptFn{
-			"url":      nil,
-			"history":  nil,
-			"registry": nil,
-			"job":      nil,
+			"request_queue": nil,
+			"url":           nil,
+			"history":       nil,
+			"registry":      nil,
+			"job":           nil,
 		},
 	}
 }
 
 func (o *clientOpt) WithCache() *RepositoryOption {
 	return &RepositoryOption{
-		storage: cachestorage.NewStorage(),
+		storage: cachestore.NewStorage(),
 		options: map[string]repositoryOptFn{
-			"url":      nil,
-			"history":  nil,
-			"registry": nil,
-			"job":      nil,
+			"request_queue": nil,
+			"url":           nil,
+			"history":       nil,
+			"registry":      nil,
+			"job":           nil,
 		},
 	}
 }
 
-func WithStorage(opts ...*RepositoryOption) (storage.Storage, error) {
+func WithStorage(opts ...*RepositoryOption) (store.Storage, error) {
 	options := map[string]repositoryOptFn{
-		"url":      nil,
-		"history":  nil,
-		"registry": nil,
-		"job":      nil,
+		"request_queue": nil,
+		"url":           nil,
+		"history":       nil,
+		"registry":      nil,
+		"job":           nil,
 	}
 
 	for _, opt := range opts {
@@ -164,6 +188,7 @@ func WithStorage(opts ...*RepositoryOption) (storage.Storage, error) {
 	}
 
 	s := newStorage(
+		options["request_queue"],
 		options["url"],
 		options["history"],
 		options["registry"],
@@ -177,7 +202,7 @@ func Client() *clientOpt {
 	return new(clientOpt)
 }
 
-func newStorage(opts ...repositoryOptFn) storage.Storage {
+func newStorage(opts ...repositoryOptFn) store.Storage {
 	s := &repositoryOpt{}
 
 	for _, o := range opts {

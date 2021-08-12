@@ -1,4 +1,4 @@
-package etcdstorage
+package etcdstore
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	fmt "fmt"
 
 	"crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -22,7 +22,7 @@ type registry struct {
 	ttlBuffer int64
 }
 
-func NewRegistryRepository(etcd *clientv3.Client, ttlBuffer int64) storage.RegistryRepository {
+func NewRegistryRepository(etcd *clientv3.Client, ttlBuffer int64) store.RegistryRepository {
 	return &registry{
 		etcd:      etcd,
 		ttlBuffer: ttlBuffer,
