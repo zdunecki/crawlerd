@@ -1,3 +1,6 @@
+const API_URL = window.CRAWLERD_API_URL || "http://localhost:8080/v1"
+const RUN_ID = window.CRAWLERD_RUN_ID || ""
+
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -17,16 +20,39 @@ function avoidScrollLockIn() {
 }
 
 // TODO: pass token
-const API = {
-    // TODO: use real api instead of mock
-    async patchIndices(links) {
-        await sleep(1000)
+function API(token) {
+    return {
+        RequestQueue: {
+            // TODO: use real api instead of mock
+            async add(links) {
+                const body = []
 
-    }
-};
+                for (const link of links) {
+                    // TODO: be sure that links are absolute
+                    body.push({
+                        run_id: RUN_ID,
+                        url: link
+                    })
+                }
+
+                await fetch(`${API_URL}/request-queue/batch`, {
+                    method: "POST",
+                    body: JSON.stringify(body)
+                })
+            }
+        },
+    };
+}
+
+const api = API();
 
 (async () => {
-    const links = {}
+    console.log("start", JSON.stringify({
+        API_URL,
+        RUN_ID,
+        href: window.location.href
+    }))
+    const links = new Set()
 
     await new Promise((resolve, reject) => {
         const maxLastScrollHeight = 3
@@ -38,22 +64,29 @@ const API = {
         let maxScrollHeight = 0
         let noMoreContentTry = 0
 
+        function searchLinks() {
+            searching = true
+            const as = document.querySelectorAll('a')
+
+            if (!as || !as.length) {
+                searching = false
+                return
+            }
+
+            as.forEach(a => {
+                links.add(a.href)
+            })
+
+            searching = false
+        }
+
+        // search before mutation observer
+        searchLinks()
+
         // TODO: find better solution
         const linksObserver = new MutationObserver(function () {
             if (!searching) {
-                searching = true
-                const as = document.querySelectorAll('a')
-
-                if (!as || !as.length) {
-                    searching = false
-                    return
-                }
-
-                as.forEach(a => {
-                    links[a.href] = a.href
-                })
-
-                searching = false
+                searchLinks()
             }
         });
 
@@ -62,7 +95,7 @@ const API = {
             childList: true
         });
 
-        let scrollID = setInterval(() => {
+        let scrollID = setInterval(async () => {
             avoidScrollLockIn()
 
             // TODO: improve scroll - smooth like a human
@@ -97,15 +130,16 @@ const API = {
         }, rand(600, 1200))
 
         setInterval(async () => {
-            const copy = {...links}
+            const copy = [...new Set(links)]
 
-            // TODO: dont' send same links between snapshots
-            await API.patchIndices(copy)
-
-            for (let href in copy) {
-                delete links[href]
+            if (!copy.length) {
+                return
             }
 
+            // TODO: dont' send same links between snapshots
+            await api.RequestQueue.add(copy)
+
+            copy.forEach(c => links.delete(c))
         }, 2000)
     })
 
