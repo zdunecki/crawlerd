@@ -5,13 +5,13 @@ import (
 	"io/ioutil"
 	"path"
 
-	"crawlerd/pkg/runner/storage"
+	"crawlerd/pkg/runner"
 )
 
 type pluginsRepository struct {
 }
 
-func (p *pluginsRepository) Get(c context.Context, name string) (string, error) {
+func (p *pluginsRepository) GetByID(c context.Context, name string) (string, error) {
 	folder := "./pkg/runner"
 
 	if b, err := ioutil.ReadFile(path.Join(folder, name)); err != nil {
@@ -25,12 +25,16 @@ type fakeStorage struct {
 	pluginsRepository *pluginsRepository
 }
 
-func newFakeStorage() storage.Storage {
+func newFakeStorage() runner.Store {
 	return &fakeStorage{
 		pluginsRepository: &pluginsRepository{},
 	}
 }
 
-func (s *fakeStorage) Functions() storage.Functions {
+func (s *fakeStorage) Functions() runner.Functions {
 	return s.pluginsRepository
+}
+
+func (s *fakeStorage) Runner() runner.Runner {
+	panic("implement me")
 }

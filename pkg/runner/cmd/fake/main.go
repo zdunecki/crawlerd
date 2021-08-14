@@ -12,5 +12,5 @@ func main() {
 	flag.StringVar(&addr, "addr", ":9998", "api address")
 	flag.Parse()
 
-	v1.New(addr, newFakeStorage()).ListenAndServe()
+	v1.New(addr, newFakeStorage(), v1.Config{}).ListenAndServe()
 }
