@@ -1,9 +1,11 @@
 package util
+
 // TODO: util should not be in pkg
 
 import (
 	"errors"
 	"net"
+	"net/url"
 )
 
 var privateIPNetworks = []net.IPNet{
@@ -41,4 +43,24 @@ func ResolveHostIP() (string, error) {
 	}
 
 	return "", errors.New("empty IP")
+}
+
+func BaseAddr(s string) string {
+	u, _ := url.Parse(s)
+	port := u.Port()
+
+	host := ""
+
+	if port != "" {
+		host = net.JoinHostPort(u.Hostname(), u.Port())
+	} else {
+		host = u.Hostname()
+	}
+
+	newU := url.URL{
+		Scheme: u.Scheme,
+		Host:   host,
+	}
+
+	return newU.String()
 }
