@@ -10,5 +10,7 @@ const (
 	DefaultCollectionRegistryName = "registry"
 	DefaultCollectionURLName      = "urls"
 	DefaultCollectionJobName      = "jobs"
+	DefaultCollectionRunnerName   = "runner"
+
 	DefaultCollectionSequenceName = "seq"
 )

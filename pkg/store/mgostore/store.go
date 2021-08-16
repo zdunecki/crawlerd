@@ -3,6 +3,7 @@ package mgostore
 import (
 	"context"
 
+	"crawlerd/pkg/runner"
 	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -13,19 +14,20 @@ type MongoStorage interface {
 }
 
 type Storage interface {
-	store.Storage
+	store.Repository
 	MongoStorage
 }
 
 type mgo struct {
 	seq *mongo.Collection
 
-	requestQueue store.RequestQueueRepository
-	linker       store.LinkerRepository
-	urlrepo      store.URLRepository
-	historyrepo  store.HistoryRepository
-	registryrepo store.RegistryRepository
-	jobrepo      store.JobRepository
+	requestQueue store.RequestQueue
+	linker       store.Linker
+	urlrepo      store.URL
+	historyrepo  store.History
+	registryrepo store.Registry
+	jobrepo      store.Job
+	runnerrepo   runner.Runner
 }
 
 func NewStore(db *mongo.Database) Storage {
@@ -38,6 +40,7 @@ func NewStore(db *mongo.Database) Storage {
 	m.historyrepo = NewHistoryRepository(db.Collection(DefaultCollectionHistoryName))
 	m.registryrepo = NewRegistryRepository(db.Collection(DefaultCollectionRegistryName))
 	m.jobrepo = NewJobRepository(db.Collection(DefaultCollectionJobName))
+	m.runnerrepo = NewRunnerRepository(db.Collection(DefaultCollectionRunnerName))
 
 	return m
 }
@@ -78,26 +81,30 @@ func (m *mgo) InsertedID(name string) (int, error) {
 	return seq.ID + 1, nil
 }
 
-func (m *mgo) RequestQueue() store.RequestQueueRepository {
+func (m *mgo) RequestQueue() store.RequestQueue {
 	return m.requestQueue
 }
 
-func (m *mgo) Linker() store.LinkerRepository {
+func (m *mgo) Linker() store.Linker {
 	return m.linker
 }
 
-func (m *mgo) URL() store.URLRepository {
+func (m *mgo) URL() store.URL {
 	return m.urlrepo
 }
 
-func (m *mgo) History() store.HistoryRepository {
+func (m *mgo) History() store.History {
 	return m.historyrepo
 }
 
-func (m *mgo) Registry() store.RegistryRepository {
+func (m *mgo) Registry() store.Registry {
 	return m.registryrepo
 }
 
-func (m *mgo) Job() store.JobRepository {
+func (m *mgo) Job() store.Job {
 	return m.jobrepo
+}
+
+func (m *mgo) Runner() runner.Runner {
+	return m.runnerrepo
 }

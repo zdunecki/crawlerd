@@ -1,6 +1,7 @@
 package options
 
 import (
+	"crawlerd/pkg/runner"
 	"crawlerd/pkg/store"
 	"crawlerd/pkg/store/cachestore"
 	"crawlerd/pkg/store/etcdstore"
@@ -10,62 +11,66 @@ import (
 )
 
 type repositoryOpt struct {
-	requestQueue store.RequestQueueRepository
-	url          store.URLRepository
-	history      store.HistoryRepository
-	registry     store.RegistryRepository
-	job          store.JobRepository
+	requestQueue store.RequestQueue
+	url          store.URL
+	history      store.History
+	registry     store.Registry
+	job          store.Job
 }
 
-func (s *repositoryOpt) Linker() store.LinkerRepository {
+func (s *repositoryOpt) Runner() runner.Runner {
 	panic("implement me")
 }
 
-func (s *repositoryOpt) RequestQueue() store.RequestQueueRepository {
+func (s *repositoryOpt) Linker() store.Linker {
+	panic("implement me")
+}
+
+func (s *repositoryOpt) RequestQueue() store.RequestQueue {
 	return s.requestQueue
 }
 
-func (s *repositoryOpt) URL() store.URLRepository {
+func (s *repositoryOpt) URL() store.URL {
 	return s.url
 }
 
-func (s *repositoryOpt) History() store.HistoryRepository {
+func (s *repositoryOpt) History() store.History {
 	return s.history
 }
 
-func (s *repositoryOpt) Registry() store.RegistryRepository {
+func (s *repositoryOpt) Registry() store.Registry {
 	return s.registry
 }
 
-func (s *repositoryOpt) Job() store.JobRepository {
+func (s *repositoryOpt) Job() store.Job {
 	return s.job
 }
 
-func withRequestQueue(r store.RequestQueueRepository) repositoryOptFn {
+func withRequestQueue(r store.RequestQueue) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.requestQueue = r
 	}
 }
 
-func withURL(r store.URLRepository) repositoryOptFn {
+func withURL(r store.URL) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.url = r
 	}
 }
 
-func withHistory(r store.HistoryRepository) repositoryOptFn {
+func withHistory(r store.History) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.history = r
 	}
 }
 
-func withRegistry(r store.RegistryRepository) repositoryOptFn {
+func withRegistry(r store.Registry) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.registry = r
 	}
 }
 
-func withJob(j store.JobRepository) repositoryOptFn {
+func withJob(j store.Job) repositoryOptFn {
 	return func(s *repositoryOpt) {
 		s.job = j
 	}
@@ -74,7 +79,7 @@ func withJob(j store.JobRepository) repositoryOptFn {
 type repositoryOptFn func(*repositoryOpt)
 
 type RepositoryOption struct {
-	storage store.Storage
+	storage store.Repository
 	options map[string]repositoryOptFn
 	err     error
 }
@@ -166,7 +171,7 @@ func (o *clientOpt) WithCache() *RepositoryOption {
 	}
 }
 
-func WithStorage(opts ...*RepositoryOption) (store.Storage, error) {
+func WithStorage(opts ...*RepositoryOption) (store.Repository, error) {
 	options := map[string]repositoryOptFn{
 		"request_queue": nil,
 		"url":           nil,
@@ -202,7 +207,7 @@ func Client() *clientOpt {
 	return new(clientOpt)
 }
 
-func newStorage(opts ...repositoryOptFn) store.Storage {
+func newStorage(opts ...repositoryOptFn) store.Repository {
 	s := &repositoryOpt{}
 
 	for _, o := range opts {

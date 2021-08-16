@@ -16,7 +16,7 @@ type linker struct {
 	coll *mongo.Collection
 }
 
-func NewLinkerRepository(coll *mongo.Collection) store.LinkerRepository {
+func NewLinkerRepository(coll *mongo.Collection) store.Linker {
 	l := &linker{
 		coll: coll,
 	}
@@ -24,13 +24,15 @@ func NewLinkerRepository(coll *mongo.Collection) store.LinkerRepository {
 	return l
 }
 
-func (l *linker) InsertManyIfNotExists(ctx context.Context, queues []*metav1.RequestQueueCreate) ([]string, error) {
+// TODO: separate structure for queues parameter
+func (l *linker) InsertManyIfNotExists(ctx context.Context, queues []*metav1.LinkNodeCreate) ([]string, error) {
 	insertedIDs := make([]string, 0)
 
 	for _, q := range queues {
-		find, err := l.coll.Find(ctx, bson.M{
-			"url": q.URL,
-		}, options.Find().SetLimit(1))
+		node := &metav1.LinkNode{
+			URL: q.URL,
+		}
+		find, err := l.coll.Find(ctx, node, options.Find().SetLimit(1))
 
 		if err != nil {
 			// TODO: log error
@@ -41,7 +43,7 @@ func (l *linker) InsertManyIfNotExists(ctx context.Context, queues []*metav1.Req
 			continue
 		}
 
-		resp, _ := l.coll.InsertOne(ctx, q)
+		resp, _ := l.coll.InsertOne(ctx, node)
 
 		if oid, ok := resp.InsertedID.(primitive.ObjectID); ok {
 			insertedIDs = append(insertedIDs, oid.Hex())
@@ -49,4 +51,25 @@ func (l *linker) InsertManyIfNotExists(ctx context.Context, queues []*metav1.Req
 	}
 
 	return insertedIDs, nil
+}
+
+func (l *linker) FindAll(ctx context.Context) ([]*metav1.LinkNode, error) {
+	cursor, err := l.coll.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+
+	var nodes []*metav1.LinkNode
+
+	for cursor.Next(ctx) {
+		var node metav1.LinkNode
+
+		if err := cursor.Decode(&node); err != nil {
+			return nil, err
+		}
+
+		nodes = append(nodes, &node)
+	}
+
+	return nodes, nil
 }

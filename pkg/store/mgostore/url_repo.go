@@ -20,7 +20,7 @@ type urlrepo struct {
 	defaultScroll int
 }
 
-func NewURLRepository(coll *mongo.Collection, client Storage) store.URLRepository {
+func NewURLRepository(coll *mongo.Collection, client Storage) store.URL {
 	return &urlrepo{
 		client:        client,
 		coll:          coll,

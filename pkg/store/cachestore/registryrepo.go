@@ -22,7 +22,7 @@ type registry struct {
 }
 
 //TODO: finish, cache implementation from argument
-func NewRegistryRepository() store.RegistryRepository {
+func NewRegistryRepository() store.Registry {
 	return &registry{
 		cache: cache.NewCache(bigcache.DefaultConfig(0)),
 	}

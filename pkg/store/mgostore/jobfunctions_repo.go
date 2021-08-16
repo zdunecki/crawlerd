@@ -14,11 +14,11 @@ import (
 
 type jobFunctions struct {
 	session *session.Session
-	job     store.JobRepository
+	job     store.Job
 }
 
 // TODO: refactor
-func NewJobFunctions(jobRepo store.JobRepository) *jobFunctions {
+func NewJobFunctions(jobRepo store.Job) *jobFunctions {
 	sess, _ := session.NewSession(&aws.Config{
 		Credentials:      credentials.NewStaticCredentials("7E17SM0N1X3C7VTNPVV4", "NY2DH3G5W0Zn8Pdkp7W+IiR3oyYxLcRRqF1MNYW+", ""),
 		Endpoint:         aws.String("http://172.22.0.2:9000"),
@@ -30,7 +30,7 @@ func NewJobFunctions(jobRepo store.JobRepository) *jobFunctions {
 	return &jobFunctions{session: sess, job: jobRepo}
 }
 
-func (jf *jobFunctions) Get(ctx context.Context, jobID string) (string, error) {
+func (jf *jobFunctions) GetByID(ctx context.Context, jobID string) (string, error) {
 	j, err := jf.job.FindOneByID(ctx, jobID)
 	if err != nil {
 		return "", err

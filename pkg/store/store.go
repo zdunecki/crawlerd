@@ -5,22 +5,26 @@ import (
 	"time"
 
 	metav1 "crawlerd/pkg/meta/v1"
-	runnerstorage "crawlerd/pkg/runner/storage"
+	"crawlerd/pkg/runner"
 )
 
 // TODO: aliases - needed for multi-tenant in same collection
 
-type RequestQueueRepository interface {
+type RequestQueue interface {
+	List(ctx context.Context, options *metav1.RequestQueueListQuery)
+
 	InsertMany(context.Context, []*metav1.RequestQueueCreate) ([]string, error)
 }
 
-type LinkerRepository interface {
-	InsertManyIfNotExists(context.Context, []*metav1.RequestQueueCreate) ([]string, error)
+type Linker interface {
+	InsertManyIfNotExists(context.Context, []*metav1.LinkNodeCreate) ([]string, error)
+
+	FindAll(context.Context) ([]*metav1.LinkNode, error)
 }
 
 // TODO: better name
-// Deprecated: URLRepository is now RequestQueueRepository
-type URLRepository interface {
+// Deprecated: URL is now RequestQueue
+type URL interface {
 	Scroll(context.Context, func([]metav1.URL)) error
 
 	FindOne(context.Context) (metav1.URL, error)
@@ -34,13 +38,13 @@ type URLRepository interface {
 	DeleteOneByID(ctx context.Context, id int) (bool, error)
 }
 
-type HistoryRepository interface {
+type History interface {
 	FindByID(ctx context.Context, id int) ([]metav1.History, error)
 
 	InsertOne(ctx context.Context, id int, response []byte, duration time.Duration, createdAt time.Time) (bool, int, error)
 }
 
-type RegistryRepository interface {
+type Registry interface {
 	GetURLByID(context.Context, int) (*metav1.CrawlURL, error)
 
 	PutURL(context.Context, metav1.CrawlURL) error
@@ -49,7 +53,7 @@ type RegistryRepository interface {
 	DeleteURLByID(context.Context, int) error
 }
 
-type JobRepository interface {
+type Job interface {
 	FindOneByID(context.Context, string) (*metav1.Job, error)
 	FindAll(context.Context) ([]metav1.Job, error)
 
@@ -57,14 +61,15 @@ type JobRepository interface {
 
 	PatchOneByID(ctx context.Context, id string, job *metav1.JobPatch) error
 
-	Functions() runnerstorage.Functions
+	Functions() runner.Functions
 }
 
-type Storage interface {
-	RequestQueue() RequestQueueRepository
-	Linker() LinkerRepository
-	URL() URLRepository
-	History() HistoryRepository
-	Registry() RegistryRepository
-	Job() JobRepository
+type Repository interface {
+	RequestQueue() RequestQueue
+	Linker() Linker
+	URL() URL
+	History() History
+	Registry() Registry
+	Job() Job
+	Runner() runner.Runner
 }

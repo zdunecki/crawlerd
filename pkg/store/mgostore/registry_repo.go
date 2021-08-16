@@ -25,7 +25,7 @@ type registry struct {
 	coll *mongo.Collection
 }
 
-func NewRegistryRepository(coll *mongo.Collection) store.RegistryRepository {
+func NewRegistryRepository(coll *mongo.Collection) store.Registry {
 	return &registry{
 		coll: coll,
 	}

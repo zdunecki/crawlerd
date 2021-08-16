@@ -22,7 +22,7 @@ type registry struct {
 	ttlBuffer int64
 }
 
-func NewRegistryRepository(etcd *clientv3.Client, ttlBuffer int64) store.RegistryRepository {
+func NewRegistryRepository(etcd *clientv3.Client, ttlBuffer int64) store.Registry {
 	return &registry{
 		etcd:      etcd,
 		ttlBuffer: ttlBuffer,
