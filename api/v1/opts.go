@@ -3,7 +3,7 @@ package v1
 import (
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/scheduler"
-	"crawlerd/pkg/storage/mgostorage"
+	"crawlerd/pkg/store/mgostore"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 )
@@ -30,7 +30,7 @@ func WithGRPCSchedulerServer(addr string) Option {
 
 func WithMongoDBStorage(dbName string, opts ...*options.ClientOptions) Option {
 	return func(a *v1) error {
-		client, err := mgostorage.NewClient(opts...)
+		client, err := mgostore.NewClient(opts...)
 		if err != nil {
 			return err
 		}
@@ -39,7 +39,7 @@ func WithMongoDBStorage(dbName string, opts ...*options.ClientOptions) Option {
 			client.SetDatabaseName(dbName)
 		}
 
-		a.storage = mgostorage.NewStorage(client.DB())
+		a.store = mgostore.NewStore(client.DB())
 
 		return nil
 	}

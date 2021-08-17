@@ -40,10 +40,12 @@ func New(router Router) API {
 
 func (a *api) Get(s string, context ContextFn) {
 	a.router.Get(s, func(writer http.ResponseWriter, request *http.Request) {
-		context(ctx{
+		c := ctx{
 			writer:  writer,
 			request: request,
-		})
+		}
+
+		context(c)
 	})
 }
 
@@ -53,19 +55,23 @@ func (a *api) Post(s string, context ContextFn, middlewares ...MiddleWare) {
 			m(writer, request)
 		}
 
-		context(ctx{
+		c := ctx{
 			writer:  writer,
 			request: request,
-		})
+		}
+
+		context(c)
 	})
 }
 
 func (a *api) Put(s string, context ContextFn) {
 	a.router.Put(s, func(writer http.ResponseWriter, request *http.Request) {
-		context(ctx{
+		c := ctx{
 			writer:  writer,
 			request: request,
-		})
+		}
+
+		context(c)
 	})
 }
 
@@ -75,19 +81,23 @@ func (a *api) Patch(s string, context ContextFn, middlewares ...MiddleWare) {
 			m(writer, request)
 		}
 
-		context(ctx{
+		c := ctx{
 			writer:  writer,
 			request: request,
-		})
+		}
+
+		context(c)
 	})
 }
 
 func (a *api) Delete(s string, context ContextFn) {
 	a.router.Delete(s, func(writer http.ResponseWriter, request *http.Request) {
-		context(ctx{
+		c := ctx{
 			writer:  writer,
 			request: request,
-		})
+		}
+
+		context(c)
 	})
 }
 

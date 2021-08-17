@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -18,7 +19,9 @@ import (
 	"crawlerd/api"
 	"crawlerd/crawlerdpb"
 	metav1 "crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/runner"
+	runnerv1 "crawlerd/pkg/runner/api/v1"
+	"crawlerd/pkg/store"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -34,20 +37,10 @@ const (
 	IntervalMinValue = 5
 )
 
-type V1URL interface {
-	Create(*RequestPostURL) (*ResponsePostURL, error)
-	Patch(id string, data *RequestPatchURL) (*ResponsePostURL, error)
-	Delete(id string) error
-	All() ([]*metav1.URL, error)
-	History(urlID string) ([]*metav1.History, error)
-}
-
-type V1 interface {
-	URL() V1URL
-}
-
 type v1 struct {
-	storage   storage.Storage
+	store       store.Repository
+	runnerStore runner.Store
+
 	scheduler crawlerdpb.SchedulerClient
 
 	schedulerBackoff *backoff.ExponentialBackOff
@@ -73,7 +66,7 @@ type VirtualFiles map[string][]byte
 
 type VirtualFilePath map[string]VirtualFiles
 
-func Unpack(bucket *blob.Bucket, dstDir string, r io.Reader) error {
+func Unpack(bucketName string, bucket *blob.Bucket, dstDir string, r io.Reader, jobRepo store.Job) error {
 	gzr, err := gzip.NewReader(r)
 	if err != nil {
 		return err
@@ -88,9 +81,12 @@ func Unpack(bucket *blob.Bucket, dstDir string, r io.Reader) error {
 
 	// TODO: not in defer
 	// TODO: delete dstDir after bundle
-	// TODO: send bundle file to storage
+	// TODO: send bundle file to store
 	// TODO: error handling
 	// TODO: parse env i.e $TOKEN in config files
+
+	// TODO: add source code files into real codespace id
+	exampleCodeSpaceID := "jg3cekg3x"
 
 	defer func() {
 		for _, cfg := range configFiles {
@@ -105,18 +101,39 @@ func Unpack(bucket *blob.Bucket, dstDir string, r io.Reader) error {
 				entry = "index.js" // TODO: index.ts
 			}
 
+			// TODO: configure output.js
+			// TODO: check if not conflict with file existing in this fs level
+			// TODO: send into another place? - separate from source code
+			jobEntryPoint := path.Join(dstDir, jobID)
+			outFilePath := path.Join(jobEntryPoint, "output.js")
+
 			// TODO: build in-memory instead of fs
 			result := esbuild.Build(esbuild.BuildOptions{
-				EntryPoints: []string{path.Join(dstDir, jobID, entry)},
-				Outfile:     path.Join(dstDir, jobID, "output.js"),
+				EntryPoints: []string{path.Join(jobEntryPoint, entry)},
+				Format:      esbuild.FormatCommonJS,
+				Outfile:     outFilePath,
 				Bundle:      true,
-				Write:       true,
+				Write:       false, // TODO: Write: false
 				LogLevel:    esbuild.LogLevelInfo,
 			})
 
 			if len(result.Errors) > 0 {
 				log.Error(result.Errors)
+				continue
 			}
+
+			//jobID, _ := filepath.Split(fullJobPath)
+
+			// TODO: when OutputFiles can be > 1 ?
+			object := "bundles/jobs/" + jobID + "/output.js"
+			if err := bucket.WriteAll(context.TODO(), "bundles/jobs/"+jobID+"/output.js", result.OutputFiles[0].Contents, nil); err != nil {
+				log.Error(err)
+				continue
+			}
+
+			jobRepo.PatchOneByID(context.TODO(), jobID, &metav1.JobPatch{
+				JavaScriptBundleSrc: path.Join(bucketName, object),
+			})
 		}
 
 	}()
@@ -163,7 +180,7 @@ func Unpack(bucket *blob.Bucket, dstDir string, r io.Reader) error {
 				// TODO: bundle files per job
 				for filePath, fileB := range fileMap {
 					//filesPerJob[jobID].Paths[dir][filePath] = fileB
-					if err := bucket.WriteAll(context.TODO(), filePath, fileB, nil); err != nil {
+					if err := bucket.WriteAll(context.TODO(), path.Join("codespaces", exampleCodeSpaceID, filePath), fileB, nil); err != nil {
 						log.Error(err)
 					}
 
@@ -182,7 +199,7 @@ func Unpack(bucket *blob.Bucket, dstDir string, r io.Reader) error {
 						log.Error(err)
 						continue
 					}
-					f.Close()
+					//f.Close() TODO: don't close folder file
 
 					if _, err := io.Copy(f, bytes.NewReader(fileB)); err != nil {
 						log.Error(err)
@@ -241,6 +258,26 @@ func Unpack(bucket *blob.Bucket, dstDir string, r io.Reader) error {
 	}
 }
 
+type runnerStore struct {
+	runner    runner.Runner
+	functions runner.Functions
+}
+
+func NewRunnerStore(s store.Repository) runner.Store {
+	return &runnerStore{
+		runner:    s.Runner(),
+		functions: s.Job().Functions(),
+	}
+}
+
+func (r runnerStore) Runner() runner.Runner {
+	return r.runner
+}
+
+func (r runnerStore) Functions() runner.Functions {
+	return r.functions
+}
+
 func New(opts ...Option) (*v1, error) {
 	v := &v1{
 		log: log.WithFields(map[string]interface{}{
@@ -262,11 +299,13 @@ func New(opts ...Option) (*v1, error) {
 		v.schedulerBackoff = bo
 	}
 
+	v.runnerStore = NewRunnerStore(v.store)
+
 	return v, nil
 }
 
 func (v *v1) Serve(addr string, v1 api.API) error {
-	if v.storage == nil {
+	if v.store == nil {
 		return ErrNoStorage
 	}
 
@@ -274,7 +313,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		return ErrNoScheduler
 	}
 
-	// TODO: storage abstraction
+	// TODO: store abstraction
 	sess, err := session.NewSession(&aws.Config{
 		Credentials:      credentials.NewStaticCredentials("7E17SM0N1X3C7VTNPVV4", "NY2DH3G5W0Zn8Pdkp7W+IiR3oyYxLcRRqF1MNYW+", ""),
 		Endpoint:         aws.String("http://172.22.0.2:9000"),
@@ -287,13 +326,72 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		return err
 	}
 
-	bucket, err := s3blob.OpenBucket(context.TODO(), sess, "crawlerd", nil)
+	bucketName := "crawlerd"
+	bucket, err := s3blob.OpenBucket(context.TODO(), sess, bucketName, nil) // TODO: get bucket name from bucket?
+
 	if err != nil {
 		v.log.Error(err)
 		return err
 	}
 
-	v1.Post("/api/urls", func(ctx api.Context) {
+	// TODO urls are now queues
+	// TODO: auth
+	// TODO: batch errors
+	v1.Post("/v1/request-queue/batch", func(c api.Context) {
+		var req []*metav1.RequestQueueCreate
+
+		// TODO: body limitations?
+		data, err := ioutil.ReadAll(c.Request().Body)
+		if err != nil {
+			v.log.Error(err)
+			c.InternalError()
+			return
+		}
+
+		if err := json.NewDecoder(bytes.NewReader(data)).Decode(&req); err != nil {
+			v.log.Error(err)
+			c.BadRequest()
+			return
+		}
+
+		{
+			linkNodes := make([]*metav1.LinkNodeCreate, len(req))
+
+			for i, r := range req {
+				if r.Validate() != nil {
+					v.log.Error(err)
+					c.BadRequest().JSON("validation error")
+					return
+				}
+
+				linkNodes[i] = &metav1.LinkNodeCreate{
+					URL: metav1.NewLinkURL(r.URL),
+				}
+			}
+
+			insertedIds, err := v.store.Linker().InsertManyIfNotExists(c.RequestContext(), linkNodes)
+			if err != nil {
+				v.log.Error(err)
+				c.InternalError()
+				return
+			}
+
+			fmt.Println(insertedIds)
+		}
+
+		ids, err := v.store.RequestQueue().InsertMany(c.RequestContext(), req)
+		if err != nil {
+			v.log.Error(err)
+			c.InternalError()
+			return
+		}
+
+		c.Created().JSON(&ResponseRequestQueueCreate{
+			IDs: ids,
+		})
+	})
+
+	v1.Post("/v1/urls", func(ctx api.Context) {
 		var req *RequestPostURL
 
 		data, err := ioutil.ReadAll(ctx.Request().Body)
@@ -319,7 +417,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			return
 		}
 
-		done, seq, err := v.storage.URL().InsertOne(ctx.RequestContext(), req.URL, req.Interval)
+		done, seq, err := v.store.URL().InsertOne(ctx.RequestContext(), req.URL, req.Interval)
 
 		if err != nil {
 			v.log.Error(err)
@@ -348,7 +446,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		})
 	}, api.WithMaxBytes(DefaultMaxPOSTContentLength))
 
-	v1.Patch("/api/urls/{id}", func(ctx api.Context) {
+	v1.Patch("/v1/urls/{id}", func(ctx api.Context) {
 		var req RequestPatchURL
 
 		id, err := ctx.ParamInt("id")
@@ -376,7 +474,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			return
 		}
 
-		done, err := v.storage.URL().UpdateOneByID(ctx.RequestContext(), id, RequestPatchURL{
+		done, err := v.store.URL().UpdateOneByID(ctx.RequestContext(), id, RequestPatchURL{
 			URL:      req.URL,
 			Interval: req.Interval,
 		})
@@ -407,7 +505,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		})
 	}, api.WithMaxBytes(DefaultMaxPOSTContentLength))
 
-	v1.Delete("/api/urls/{id}", func(ctx api.Context) {
+	v1.Delete("/v1/urls/{id}", func(ctx api.Context) {
 		id, err := ctx.ParamInt("id")
 		if err != nil {
 			v.log.Error(err)
@@ -415,7 +513,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			return
 		}
 
-		done, err := v.storage.URL().DeleteOneByID(ctx.RequestContext(), id)
+		done, err := v.store.URL().DeleteOneByID(ctx.RequestContext(), id)
 
 		if err != nil {
 			v.log.Error(err)
@@ -440,8 +538,8 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		ctx.NoContent()
 	})
 
-	v1.Get("/api/urls", func(ctx api.Context) {
-		urls, err := v.storage.URL().FindAll(ctx.RequestContext())
+	v1.Get("/v1/urls", func(ctx api.Context) {
+		urls, err := v.store.URL().FindAll(ctx.RequestContext())
 		if err != nil {
 			v.log.Error(err)
 			ctx.BadRequest()
@@ -455,7 +553,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		ctx.JSON(urls)
 	})
 
-	v1.Get("/api/urls/{id}/history", func(ctx api.Context) {
+	v1.Get("/v1/urls/{id}/history", func(ctx api.Context) {
 		id, err := ctx.ParamInt("id")
 		if err != nil {
 			v.log.Error(err)
@@ -463,7 +561,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			return
 		}
 
-		history, err := v.storage.History().FindByID(ctx.RequestContext(), id)
+		history, err := v.store.History().FindByID(ctx.RequestContext(), id)
 		if err != nil {
 			v.log.Error(err)
 			ctx.InternalError()
@@ -477,8 +575,11 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		ctx.JSON(history)
 	})
 
-	// TODO: bigcrawl endpoints
+	// TODO: bigcrawl endpoint
 	// TODO: auth
+
+	// BIG CRAWL ENDPOINTS
+
 	v1.Post("/v1/cmd/apply", func(ctx api.Context) {
 		//r, err := gzip.NewReader(ctx.Request().Body)
 		wd, err := os.Getwd()
@@ -488,7 +589,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			return
 		}
 
-		err = Unpack(bucket, path.Join(wd, "OUTPUT"), ctx.Request().Body)
+		err = Unpack(bucketName, bucket, path.Join(wd, "OUTPUT"), ctx.Request().Body, v.store.Job())
 		//err = Unpack(bucket, ctx.Request().Body)
 		if err != nil {
 			v.log.Error(err)
@@ -514,17 +615,19 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			return
 		}
 
-		if err := v.storage.Job().InsertOne(context.TODO(), req); err != nil {
+		if id, err := v.store.Job().InsertOne(context.TODO(), req); err != nil {
 			v.log.Error(err)
 			c.InternalError().JSON("something went wrong")
 			return
+		} else {
+			c.JSON(map[string]string{
+				"id": id,
+			})
 		}
-
-		c.JSON("ok")
 	})
 
 	v1.Get("/v1/jobs", func(c api.Context) {
-		if jobs, err := v.storage.Job().FindAll(context.TODO()); err != nil {
+		if jobs, err := v.store.Job().FindAll(context.TODO()); err != nil {
 			v.log.Error(err)
 			c.InternalError().JSON("something went wrong")
 			return
@@ -536,7 +639,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 	v1.Get("/v1/jobs/{id}", func(c api.Context) {
 		id := c.Param("id")
 
-		if job, err := v.storage.Job().FindOneByID(context.TODO(), id); err != nil {
+		if job, err := v.store.Job().FindOneByID(context.TODO(), id); err != nil {
 			v.log.Error(err)
 			c.InternalError().JSON("something went wrong")
 			return
@@ -556,7 +659,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		id := c.Param("id")
 
-		if job, err := v.storage.Job().FindOneByID(context.TODO(), id); err != nil {
+		if job, err := v.store.Job().FindOneByID(context.TODO(), id); err != nil {
 			v.log.Error(err)
 			c.InternalError().JSON("something went wrong")
 			return
@@ -570,7 +673,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			}
 		}
 
-		if err := v.storage.Job().PatchOneByID(context.TODO(), id, req); err != nil {
+		if err := v.store.Job().PatchOneByID(context.TODO(), id, req); err != nil {
 			v.log.Error(err)
 			c.InternalError().JSON("something went wrong")
 			return
@@ -579,8 +682,31 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		c.JSON("ok")
 	})
 
+	v1.Get("/v1/linker", func(ctx api.Context) {
+		nodes, err := v.store.Linker().FindAll(ctx.RequestContext())
+		if err != nil {
+			v.log.Error(err)
+			ctx.BadRequest()
+			return
+		}
+
+		if nodes == nil {
+			nodes = []*metav1.LinkNode{}
+		}
+
+		ctx.JSON(nodes)
+	})
+
+	runner := runnerv1.New(":9888", v.runnerStore, runnerv1.Config{})
+
+	go runner.ListenAndServe()
+
 	v.log.Info("listening on: ", addr)
 	return http.ListenAndServe(addr, v1.Handler())
+}
+
+func (v *v1) Store() store.Repository {
+	return v.store
 }
 
 func (v *v1) schedulerRetry(f func() error) error {

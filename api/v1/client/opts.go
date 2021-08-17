@@ -6,8 +6,8 @@ type options struct {
 	addr string
 }
 
-func WithHTTP(apiURL string) Option {
+func WithHTTPAddr(apiAddr string) Option {
 	return func(o *options) {
-		o.addr = apiURL
+		o.addr = apiAddr
 	}
 }

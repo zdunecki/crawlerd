@@ -1,7 +1,11 @@
 package client
 
+// TODO: client vs sdk vs something else ?
+
 import (
 	"errors"
+	"net/http"
+	"time"
 
 	v1 "crawlerd/api/v1"
 )
@@ -14,9 +18,9 @@ func NewWithOpts(opts ...Option) (v1.V1, error) {
 	}
 
 	if opt.addr != "" {
-		return &httpClient{
-			url: newHTTPURL(opt.addr),
-		}, nil
+		return newHTTPClient(opt.addr+"/v1", &http.Client{
+			Timeout: time.Second * 15, // TODO: timeout config
+		}), nil
 	}
 
 	return nil, errors.New("api url is not defined")
