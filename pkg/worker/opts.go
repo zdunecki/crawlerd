@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"crawlerd/pkg/pubsub"
-	"crawlerd/pkg/storage/options"
+	"crawlerd/pkg/store/options"
 	"github.com/andybalholm/brotli"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/client-go/kubernetes"

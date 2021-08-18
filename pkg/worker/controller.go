@@ -7,7 +7,7 @@ import (
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/apikit/pkg/scheduler"
 	metav1 "crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,12 +17,12 @@ type Controller interface {
 
 type controller struct {
 	scheduler crawlerdpb.SchedulerClient
-	registry  storage.RegistryRepository
+	registry  store.Registry
 
 	log *log.Entry
 }
 
-func NewController(scheduler crawlerdpb.SchedulerClient, registry storage.RegistryRepository) Controller {
+func NewController(scheduler crawlerdpb.SchedulerClient, registry store.Registry) Controller {
 	return &controller{
 		scheduler: scheduler,
 		registry:  registry,

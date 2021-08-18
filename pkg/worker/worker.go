@@ -12,7 +12,7 @@ import (
 
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/pubsub"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -33,7 +33,7 @@ type worker struct {
 	schedulerAddr string
 
 	httpClient *http.Client
-	storage    storage.Storage
+	storage    store.Repository
 	crawler    Crawler
 	ctrl       Controller
 	pubsub     pubsub.PubSub

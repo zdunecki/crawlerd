@@ -2,6 +2,18 @@ package v1
 
 import "errors"
 
+func (r RunnerEngineList) isValid(e RunnerEngine) bool {
+	validEngine := false
+	for _, engine := range RunnerEngineListAll {
+		if e == engine {
+			validEngine = true
+			break
+		}
+	}
+
+	return validEngine
+}
+
 func (j *JobCreate) Validate() error {
 	if j.Name == "" {
 		return errors.New("name is required")
@@ -11,14 +23,14 @@ func (j *JobCreate) Validate() error {
 		return errors.New("runner engine is required")
 	}
 
-	validEngine := RunnerEngineAll.isValid(j.RunnerEngine)
+	validEngine := RunnerEngineListAll.isValid(j.RunnerEngine)
 
 	if !validEngine {
 		return errors.New("invalid engine")
 	}
 
 	if j.JavaScriptBundleSrc != "" && j.RunnerEngine != RunnerEngineChromium {
-		return errors.New("(JobCreate): javascript bundle source is available only for chromium engine")
+		return errors.New("javascript bundle source is available only for chromium engine")
 	}
 
 	return nil
@@ -26,7 +38,7 @@ func (j *JobCreate) Validate() error {
 
 func (j *JobPatch) Validate() error {
 	if j.RunnerEngine != "" {
-		validEngine := RunnerEngineAll.isValid(j.RunnerEngine)
+		validEngine := RunnerEngineListAll.isValid(j.RunnerEngine)
 
 		if !validEngine {
 			return errors.New("invalid engine")
@@ -34,7 +46,19 @@ func (j *JobPatch) Validate() error {
 	}
 
 	if j.JavaScriptBundleSrc != "" && j.RunnerEngine != RunnerEngineChromium {
-		return errors.New("(JobCreate): javascript bundle source is available only for chromium engine")
+		return errors.New("javascript bundle source is available only for chromium engine")
+	}
+
+	return nil
+}
+
+func (req *RequestQueueCreate) Validate() error {
+	if req.RunID == "" {
+		return errors.New("runner id is required")
+	}
+
+	if req.URL == "" {
+		return errors.New("request queue url is required")
 	}
 
 	return nil

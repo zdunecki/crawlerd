@@ -7,7 +7,7 @@ import (
 
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,8 +30,8 @@ type Watcher interface {
 
 type watcher struct {
 	workerCluster worker.Cluster
-	url           storage.URLRepository
-	registry      storage.RegistryRepository
+	url           store.URL
+	registry      store.Registry
 	mu            *sync.RWMutex
 	jobDoneC      chan bool
 	isJobRunning  bool
@@ -43,7 +43,7 @@ type watcher struct {
 	log *log.Entry
 }
 
-func NewWatcher(workerCluster worker.Cluster, url storage.URLRepository, registry storage.RegistryRepository, timerTimeout time.Duration) Watcher {
+func NewWatcher(workerCluster worker.Cluster, url store.URL, registry store.Registry, timerTimeout time.Duration) Watcher {
 	return &watcher{
 		workerCluster:   workerCluster,
 		url:             url,
@@ -83,6 +83,8 @@ func (w *watcher) WatchWorkers(f func(WorkerWatcherEvent)) {
 }
 
 // TODO: tests
+// TODO: watcher should work similar to message queues, another option is to use production ready message queue like NATs but everything should be under watcher abstraction
+
 // WatchNewURLs loop through all url's and send to crawl if neither worker didn't do that
 // it's helpful especially at start process if any url already exist in database
 func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
@@ -109,6 +111,7 @@ func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 		}()
 
 		// TODO: consider better solution than scrolling whole urls
+		// TODO: scroll not acked request queues
 		if err := w.url.Scroll(context.Background(), func(urls []v1.URL) {
 			w.log.Debugf("found url's candidates to start crawl, len=%d", len(urls))
 

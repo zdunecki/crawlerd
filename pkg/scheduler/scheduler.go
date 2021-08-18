@@ -9,7 +9,7 @@ import (
 
 	"crawlerd/crawlerdpb"
 	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
@@ -28,8 +28,8 @@ type Scheduler interface {
 }
 
 type scheduler struct {
-	storage       storage.Storage
-	watcher       Watcher
+	storage store.Repository
+	watcher Watcher
 	leasing       Leasing
 	server        Server
 	clusterConfig *worker.Config

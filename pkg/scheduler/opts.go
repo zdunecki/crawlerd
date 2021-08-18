@@ -4,8 +4,8 @@ import (
 	"time"
 
 	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
-	"crawlerd/pkg/storage"
-	"crawlerd/pkg/storage/options"
+	"crawlerd/pkg/store"
+	"crawlerd/pkg/store/options"
 	"crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/client-go/kubernetes"
@@ -24,7 +24,7 @@ type (
 		etcdConfig   *clientv3.Config
 		k8sConfig    *k8sConfig
 		timerTimeout *time.Duration
-		storage      storage.Storage
+		storage      store.Repository
 		clusterType  worker.ClusterType
 	}
 )
@@ -63,7 +63,7 @@ func (o *WatcherOption) WithTimerTimeout(t time.Duration) *WatcherOption {
 	return o
 }
 
-func (o *WatcherOption) WithStorage(s storage.Storage) *WatcherOption {
+func (o *WatcherOption) WithStorage(s store.Repository) *WatcherOption {
 	o.storage = s
 
 	return o

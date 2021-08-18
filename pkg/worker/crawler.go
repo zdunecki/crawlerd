@@ -11,7 +11,7 @@ import (
 	"crawlerd/crawlerdpb"
 	metav1 "crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/pubsub"
-	"crawlerd/pkg/storage"
+	"crawlerd/pkg/store"
 	"crawlerd/pkg/util"
 	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
@@ -54,8 +54,8 @@ type crawler struct {
 	httpClient *http.Client
 
 	worker   Worker
-	history  storage.HistoryRepository
-	registry storage.RegistryRepository
+	history  store.History
+	registry store.Registry
 
 	processor  *processor
 	pageLookup *pageLookup
@@ -70,7 +70,7 @@ type crawler struct {
 	log *log.Entry
 }
 
-func NewCrawler(storage storage.Storage, worker Worker, pubsub pubsub.PubSub, compressor Compressor, httpClient *http.Client) Crawler {
+func NewCrawler(storage store.Repository, worker Worker, pubsub pubsub.PubSub, compressor Compressor, httpClient *http.Client) Crawler {
 	c := &crawler{
 		wgStop: &sync.WaitGroup{},
 
