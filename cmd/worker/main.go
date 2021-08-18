@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"crawlerd/pkg/pubsub"
-	storageopt "crawlerd/pkg/storage/options"
+	storageopt "crawlerd/pkg/store/options"
 	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -113,7 +113,7 @@ func main() {
 		if mongoHost == "" {
 			storageOpts := []*storageopt.RepositoryOption{
 				storageopt.Client().
-					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", "localhost"))).URL().History().Registry(),
+					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:27017", "localhost"))).URL().History().Registry().RequestQueue(),
 			}
 
 			if etcdRegistry {
@@ -124,7 +124,7 @@ func main() {
 		} else {
 			storageOpts := []*storageopt.RepositoryOption{
 				storageopt.Client().
-					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort))).URL().History(),
+					WithMongoDB(dbName, options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort))).URL().History().RequestQueue(),
 			}
 
 			if etcdRegistry {

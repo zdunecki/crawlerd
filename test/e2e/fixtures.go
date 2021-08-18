@@ -11,7 +11,7 @@ import (
 	"crawlerd/api/v1/client"
 	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/scheduler"
-	storageopt "crawlerd/pkg/storage/options"
+	storageopt "crawlerd/pkg/store/options"
 	"crawlerd/pkg/worker"
 	"github.com/go-chi/chi/v5"
 	"github.com/orlangure/gnomock"
@@ -243,7 +243,7 @@ func setupClient(opts *setupOptions) (*setup, error) {
 
 	time.Sleep(time.Second * 1)
 
-	c, err := client.NewWithOpts(client.WithHTTP("http://localhost:6666"))
+	c, err := client.NewWithOpts(client.WithHTTPAddr("http://localhost:6666"))
 
 	return &setup{
 		etcdContainer: etcdContainer,

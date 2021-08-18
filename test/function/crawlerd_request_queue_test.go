@@ -7,14 +7,14 @@ import (
 )
 
 func TestRequestQueueCreateAPIEndpoint(t *testing.T) {
-	clientv1, done, err := testMongoDBAPI()
+	apiv1, _, done, err := testMongoDBAPI()
 	defer done()
 
 	if err != nil {
 		t.Error(err)
 	}
 
-	rq := clientv1.RequestQueue()
+	rq := apiv1.RequestQueue()
 
 	// TODO: test linker - should have be inserted once
 

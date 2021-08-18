@@ -108,7 +108,7 @@ func main() {
 			//
 			//	pathDir, f := path.Split(p)
 			//
-			//	fmt.Println(pathDir, f, folderConfig[pathDir].Get("entry"))
+			//	fmt.Println(pathDir, f, folderConfig[pathDir].GetByID("entry"))
 			//	return nil
 			//})
 			//

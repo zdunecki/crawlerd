@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"crawlerd/api/v1"
-	"crawlerd/pkg/storage/etcdstorage"
+	"crawlerd/pkg/store/etcdstore"
 	"crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -228,7 +228,7 @@ func TestCrawlWithGracefullShutDown(t *testing.T) {
 
 	// crawl url should exists in registry after api request
 	{
-		workerKv, err := etcd.Get(context.Background(), etcdstorage.KeyCrawlURL, clientv3.WithPrefix())
+		workerKv, err := etcd.Get(context.Background(), etcdstore.KeyCrawlURL, clientv3.WithPrefix())
 		if err != nil {
 			t.Error(err)
 			return
@@ -269,7 +269,7 @@ wait:
 
 	// crawl url should be empty because worker shutdown
 	{
-		workerKv, err := etcd.Get(context.Background(), etcdstorage.KeyCrawlURL, clientv3.WithPrefix())
+		workerKv, err := etcd.Get(context.Background(), etcdstore.KeyCrawlURL, clientv3.WithPrefix())
 		if err != nil {
 			t.Error(err)
 			return
@@ -355,7 +355,7 @@ func TestCrawlWithGracefullShutDownWithMultipleWorkers(t *testing.T) {
 
 	// crawl url should exists in registry after api request
 	{
-		workerKv, err := etcd.Get(context.Background(), etcdstorage.KeyCrawlURL, clientv3.WithPrefix())
+		workerKv, err := etcd.Get(context.Background(), etcdstore.KeyCrawlURL, clientv3.WithPrefix())
 		if err != nil {
 			t.Error(err)
 			return
@@ -398,7 +398,7 @@ wait:
 
 	// crawl url should be still one because of Controller.ReAttachResources
 	{
-		workerKv, err := etcd.Get(context.Background(), etcdstorage.KeyCrawlURL, clientv3.WithPrefix())
+		workerKv, err := etcd.Get(context.Background(), etcdstore.KeyCrawlURL, clientv3.WithPrefix())
 		if err != nil {
 			t.Error(err)
 			return

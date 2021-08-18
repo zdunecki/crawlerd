@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 
 	"crawlerd/api"
 	"crawlerd/api/v1"
@@ -38,6 +39,9 @@ func main() {
 
 	var opts []v1.Option
 
+
+	// TODO: support different stores
+
 	if mongo {
 		if mongoHost == "" {
 			opts = append(opts, v1.WithMongoDBStorage(dbName))
@@ -56,7 +60,23 @@ func main() {
 		panic(err)
 	}
 
-	if err := apiV1.Serve(addr, api.New(chi.NewRouter())); err != nil {
+	r := chi.NewRouter()
+	// TODO: cors config
+	r.Use(func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, PATCH, DELETE")
+
+			if r.Method == "OPTIONS" {
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(fn)
+	})
+
+	if err := apiV1.Serve(addr, api.New(r)); err != nil {
 		panic(err)
 	}
 }
