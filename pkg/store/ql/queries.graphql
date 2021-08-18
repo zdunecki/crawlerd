@@ -1,0 +1,20 @@
+query GetA($RunID: String) {
+    RequestQueueList(
+        query: {
+            bool: {
+                must: [
+                    {
+                        term: {RunID: $RunID}
+                    },
+
+                ]
+            }
+        }
+    ) {
+        RunID
+    }
+
+    fu
+    q(func: )
+}
+

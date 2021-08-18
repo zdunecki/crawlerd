@@ -1,0 +1,58 @@
+directive @tag(
+    json: String = ""
+) on FIELD_DEFINITION | ENUM_VALUE
+
+#input RequestQueueListQLBoolInput {
+#    Bool: String
+#}
+
+input RequestQueueListQLQueryTermInput {
+    RunID: String
+}
+
+input RequestQueueListQLQueryRangeCreatedAtInput {
+    gt: Int
+    gte: Int
+
+    lt: Int
+    lte: Int
+}
+
+input RequestQueueListQLQueryRangeInput {
+    CreatedAt: RequestQueueListQLQueryRangeCreatedAtInput
+}
+
+input RequestQueueListQLQueryInput {
+    term: RequestQueueListQLQueryTermInput
+    range: RequestQueueListQLQueryRangeInput
+}
+
+input RequestQueueListQLBoolInput {
+    must: [RequestQueueListQLQueryInput]
+    should: [RequestQueueListQLQueryInput]
+}
+
+input RequestQueueListQLInputV2 {
+    bool: RequestQueueListQLBoolInput
+}
+
+input RequestQueueListQLInput {
+    RunID: String
+}
+
+type RequestQueue {
+    RunID: String @tag(json: "run_id,omitempty")
+}
+
+input QInput {
+    Abc: String
+}
+
+type Query {
+    RequestQueueList(query: RequestQueueListQLInputV2): RequestQueue
+    #    q(func: QInput): String
+}
+
+extend type Query {
+    func(a: String): String
+}
