@@ -3,7 +3,6 @@ package mgostore
 import (
 	"context"
 
-	"crawlerd/pkg/runner"
 	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -21,13 +20,14 @@ type Storage interface {
 type mgo struct {
 	seq *mongo.Collection
 
-	requestQueue store.RequestQueue
-	linker       store.Linker
-	urlrepo      store.URL
-	historyrepo  store.History
-	registryrepo store.Registry
-	jobrepo      store.Job
-	runnerrepo   runner.Runner
+	requestQueue       store.RequestQueue
+	linker             store.Linker
+	urlRepo            store.URL
+	historyRepo        store.History
+	registryRepo       store.Registry
+	jobRepo            store.Job
+	runnerRepo         store.Runner
+	runnerFunctionRepo store.RunnerFunctions
 }
 
 func NewStore(db *mongo.Database) Storage {
@@ -36,11 +36,12 @@ func NewStore(db *mongo.Database) Storage {
 	}
 	m.requestQueue = NewRequestQueueRepository(db.Collection(DefaultCollectionRequestQueue))
 	m.linker = NewLinkerRepository(db.Collection(DefaultCollectionLinker))
-	m.urlrepo = NewURLRepository(db.Collection(DefaultCollectionURLName), m)
-	m.historyrepo = NewHistoryRepository(db.Collection(DefaultCollectionHistoryName))
-	m.registryrepo = NewRegistryRepository(db.Collection(DefaultCollectionRegistryName))
-	m.jobrepo = NewJobRepository(db.Collection(DefaultCollectionJobName))
-	m.runnerrepo = NewRunnerRepository(db.Collection(DefaultCollectionRunnerName))
+	m.urlRepo = NewURLRepository(db.Collection(DefaultCollectionURLName), m)
+	m.historyRepo = NewHistoryRepository(db.Collection(DefaultCollectionHistoryName))
+	m.registryRepo = NewRegistryRepository(db.Collection(DefaultCollectionRegistryName))
+	m.jobRepo = NewJobRepository(db.Collection(DefaultCollectionJobName))
+	m.runnerRepo = NewRunnerRepository(db.Collection(DefaultCollectionRunnerName))
+	m.runnerFunctionRepo = NewJobFunctions(m.jobRepo)
 
 	return m
 }
@@ -90,21 +91,25 @@ func (m *mgo) Linker() store.Linker {
 }
 
 func (m *mgo) URL() store.URL {
-	return m.urlrepo
+	return m.urlRepo
 }
 
 func (m *mgo) History() store.History {
-	return m.historyrepo
+	return m.historyRepo
 }
 
 func (m *mgo) Registry() store.Registry {
-	return m.registryrepo
+	return m.registryRepo
 }
 
 func (m *mgo) Job() store.Job {
-	return m.jobrepo
+	return m.jobRepo
 }
 
-func (m *mgo) Runner() runner.Runner {
-	return m.runnerrepo
+func (m *mgo) Runner() store.Runner {
+	return m.runnerRepo
+}
+
+func (m *mgo) RunnerFunctions() store.RunnerFunctions {
+	return m.runnerFunctionRepo
 }

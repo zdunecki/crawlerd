@@ -95,8 +95,22 @@ func (c *httpClient) request(method, resource string, body interface{}, outPtr i
 		return err
 	}
 
-	if outPtr != nil {
-		return jsoniter.NewDecoder(resp.Body).Decode(outPtr)
+	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		if outPtr != nil {
+			return jsoniter.NewDecoder(resp.Body).Decode(outPtr)
+		}
+
+		return nil
+	}
+
+	if resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < 600 {
+		apiErr := &v1.APIError{}
+
+		if err := jsoniter.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return err
+		}
+
+		return apiErr
 	}
 
 	return nil

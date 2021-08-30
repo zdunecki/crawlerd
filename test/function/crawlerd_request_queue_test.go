@@ -7,11 +7,12 @@ import (
 )
 
 func TestRequestQueueCreateAPIEndpoint(t *testing.T) {
-	apiv1, _, done, err := testMongoDBAPI()
+	apiv1, _, _, done, err := testMongoDBAPI()
 	defer done()
 
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	rq := apiv1.RequestQueue()
@@ -21,34 +22,40 @@ func TestRequestQueueCreateAPIEndpoint(t *testing.T) {
 	{
 		data := []*metav1.RequestQueueCreate{
 			{
-				URL: "https://example.com",
+				RunID: "123",
+				URL:   "https://example.com",
 			},
 		}
 
 		resp, err := rq.BatchCreate(data)
 		if err != nil {
 			t.Error(err)
+			return
 		}
 
 		if resp == nil || len(resp.IDs) != 1 {
 			t.Error("batch create ids len should be equal 1")
+			return
 		}
 	}
 
 	{
 		data := []*metav1.RequestQueueCreate{
 			{
-				URL: "https://example.com",
+				RunID: "123",
+				URL:   "https://example.com",
 			},
 		}
 
 		resp, err := rq.BatchCreate(data)
 		if err != nil {
 			t.Error(err)
+			return
 		}
 
 		if resp == nil || len(resp.IDs) != 1 {
 			t.Error("batch create ids len should be equal 1")
+			return
 		}
 	}
 }

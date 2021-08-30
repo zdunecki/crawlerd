@@ -4,6 +4,7 @@ import (
 	"crawlerd/crawlerdpb"
 	"crawlerd/pkg/scheduler"
 	"crawlerd/pkg/store/mgostore"
+	storeOptions "crawlerd/pkg/store/options"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 )
@@ -40,6 +41,20 @@ func WithMongoDBStorage(dbName string, opts ...*options.ClientOptions) Option {
 		}
 
 		a.store = mgostore.NewStore(client.DB())
+
+		return nil
+	}
+}
+
+func WithStore(opts ...*storeOptions.RepositoryOption) Option {
+	return func(a *v1) error {
+		store, err := storeOptions.WithStorage(opts...)
+
+		if err != nil {
+			return err
+		}
+
+		a.store = store
 
 		return nil
 	}

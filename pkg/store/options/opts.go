@@ -1,7 +1,6 @@
 package options
 
 import (
-	"crawlerd/pkg/runner"
 	"crawlerd/pkg/store"
 	"crawlerd/pkg/store/cachestore"
 	"crawlerd/pkg/store/etcdstore"
@@ -11,19 +10,144 @@ import (
 )
 
 type repositoryOpt struct {
-	requestQueue store.RequestQueue
-	url          store.URL
-	history      store.History
-	registry     store.Registry
-	job          store.Job
+	requestQueue    store.RequestQueue
+	url             store.URL
+	history         store.History
+	registry        store.Registry
+	job             store.Job
+	linker          store.Linker
+	runner          store.Runner
+	runnerFunctions store.RunnerFunctions
 }
 
-func (s *repositoryOpt) Runner() runner.Runner {
-	panic("implement me")
+type RepositoryOption struct {
+	storage store.Repository
+
+	err        error
+	repository *repositoryOpt
+	apply      func(o *RepositoryOption) // TODO: find better solution. apply should add changes from option to orignal WithStorage opts
+}
+
+type clientOpt struct {
+}
+
+func Client() *clientOpt {
+	return new(clientOpt)
+}
+
+func WithStorage(opts ...*RepositoryOption) (store.Repository, error) {
+	s := &repositoryOpt{}
+
+	apply := func(o *RepositoryOption) {
+		if o.repository.requestQueue != nil {
+			s.requestQueue = o.repository.requestQueue
+		}
+		if o.repository.url != nil {
+			s.url = o.repository.url
+		}
+		if o.repository.history != nil {
+			s.history = o.repository.history
+		}
+		if o.repository.registry != nil {
+			s.registry = o.repository.registry
+		}
+		if o.repository.job != nil {
+			s.job = o.repository.job
+		}
+		if o.repository.linker != nil {
+			s.linker = o.repository.linker
+		}
+		if o.repository.runner != nil {
+			s.runner = o.repository.runner
+		}
+		if o.repository.runnerFunctions != nil {
+			s.runnerFunctions = o.repository.runnerFunctions
+		}
+	}
+
+	for _, o := range opts {
+		if o.err != nil {
+			return nil, o.err
+		}
+		apply(o)
+
+		o.apply = apply
+	}
+
+	return s, nil
+}
+
+func (o *clientOpt) WithMongoDB(urlDBName string, urlCfg *options.ClientOptions) *RepositoryOption {
+	client, err := mgostore.NewClient(urlCfg)
+	if err != nil {
+		return &RepositoryOption{
+			err: err,
+		}
+	}
+
+	if urlDBName != "" {
+		client.SetDatabaseName(urlDBName)
+	}
+
+	s := mgostore.NewStore(client.DB())
+
+	return &RepositoryOption{
+		storage: s,
+		repository: &repositoryOpt{
+			requestQueue:    s.RequestQueue(),
+			url:             s.URL(),
+			history:         s.History(),
+			registry:        s.Registry(),
+			job:             s.Job(),
+			linker:          s.Linker(),
+			runner:          s.Runner(),
+			runnerFunctions: s.RunnerFunctions(),
+		},
+	}
+}
+
+func (o *clientOpt) WithETCD(registryCfg clientv3.Config, registryTTLBuffer int64) *RepositoryOption {
+	etcd, err := clientv3.New(registryCfg)
+	if err != nil {
+		return &RepositoryOption{
+			err: err,
+		}
+	}
+
+	s := etcdstore.NewStorage(etcd, registryTTLBuffer)
+
+	return &RepositoryOption{
+		storage: s,
+		repository: &repositoryOpt{
+			requestQueue:    s.RequestQueue(),
+			url:             s.URL(),
+			history:         s.History(),
+			registry:        s.Registry(),
+			job:             s.Job(),
+			linker:          s.Linker(),
+			runner:          s.Runner(),
+			runnerFunctions: s.RunnerFunctions(),
+		},
+	}
+}
+
+// TODO: implementation
+func (o *clientOpt) WithCache() *RepositoryOption {
+	return &RepositoryOption{
+		storage: cachestore.NewStorage(),
+	}
+}
+
+func (s *repositoryOpt) RunnerFunctions() store.RunnerFunctions {
+	return s.runnerFunctions
+}
+
+func (s *repositoryOpt) Runner() store.Runner {
+	return s.runner
 }
 
 func (s *repositoryOpt) Linker() store.Linker {
-	panic("implement me")
+	return s.linker
 }
 
 func (s *repositoryOpt) RequestQueue() store.RequestQueue {
@@ -46,173 +170,51 @@ func (s *repositoryOpt) Job() store.Job {
 	return s.job
 }
 
-func withRequestQueue(r store.RequestQueue) repositoryOptFn {
-	return func(s *repositoryOpt) {
-		s.requestQueue = r
-	}
-}
-
-func withURL(r store.URL) repositoryOptFn {
-	return func(s *repositoryOpt) {
-		s.url = r
-	}
-}
-
-func withHistory(r store.History) repositoryOptFn {
-	return func(s *repositoryOpt) {
-		s.history = r
-	}
-}
-
-func withRegistry(r store.Registry) repositoryOptFn {
-	return func(s *repositoryOpt) {
-		s.registry = r
-	}
-}
-
-func withJob(j store.Job) repositoryOptFn {
-	return func(s *repositoryOpt) {
-		s.job = j
-	}
-}
-
-type repositoryOptFn func(*repositoryOpt)
-
-type RepositoryOption struct {
-	storage store.Repository
-	options map[string]repositoryOptFn
-	err     error
-}
-
 func (o *RepositoryOption) RequestQueue() *RepositoryOption {
-	o.options["request_queue"] = withRequestQueue(o.storage.RequestQueue())
+	o.repository.requestQueue = o.storage.RequestQueue()
 	return o
 }
 
 func (o *RepositoryOption) URL() *RepositoryOption {
-	o.options["url"] = withURL(o.storage.URL())
+	o.repository.url = o.storage.URL()
 	return o
 }
+
 func (o *RepositoryOption) History() *RepositoryOption {
-	o.options["history"] = withHistory(o.storage.History())
+	o.repository.history = o.storage.History()
 	return o
 }
+
 func (o *RepositoryOption) Registry() *RepositoryOption {
-	o.options["registry"] = withRegistry(o.storage.Registry())
+	o.repository.registry = o.storage.Registry()
 	return o
 }
 
 func (o *RepositoryOption) Job() *RepositoryOption {
-	o.options["job"] = withJob(o.storage.Job())
+	o.repository.job = o.storage.Job()
 	return o
 }
 
-type clientOpt struct {
+func (o *RepositoryOption) Runner() *RepositoryOption {
+	o.repository.runner = o.storage.Runner()
+	return o
 }
 
-func (o *clientOpt) WithMongoDB(urlDBName string, urlCfg *options.ClientOptions) *RepositoryOption {
-	client, err := mgostore.NewClient(urlCfg)
-	if err != nil {
-		return &RepositoryOption{
-			err: err,
-		}
-	}
-
-	if urlDBName != "" {
-		client.SetDatabaseName(urlDBName)
-	}
-
-	s := mgostore.NewStore(client.DB())
-
-	return &RepositoryOption{
-		storage: s,
-		options: map[string]repositoryOptFn{
-			"request_queue": nil,
-			"url":           nil,
-			"history":       nil,
-			"registry":      nil,
-			"job":           nil,
-		},
-	}
+func (o *RepositoryOption) RunnerFunctions() *RepositoryOption {
+	o.repository.runnerFunctions = o.storage.RunnerFunctions()
+	return o
 }
 
-func (o *clientOpt) WithETCD(registryCfg clientv3.Config, registryTTLBuffer int64) *RepositoryOption {
-	etcd, err := clientv3.New(registryCfg)
-	if err != nil {
-		return &RepositoryOption{
-			err: err,
-		}
-	}
-
-	etcdStorage := etcdstore.NewStorage(etcd, registryTTLBuffer)
-
-	return &RepositoryOption{
-		storage: etcdStorage,
-		options: map[string]repositoryOptFn{
-			"request_queue": nil,
-			"url":           nil,
-			"history":       nil,
-			"registry":      nil,
-			"job":           nil,
-		},
-	}
+func (o *RepositoryOption) CustomRunnerFunctions(rf store.RunnerFunctions) *RepositoryOption {
+	o.repository.runnerFunctions = rf
+	return o
 }
 
-func (o *clientOpt) WithCache() *RepositoryOption {
-	return &RepositoryOption{
-		storage: cachestore.NewStorage(),
-		options: map[string]repositoryOptFn{
-			"request_queue": nil,
-			"url":           nil,
-			"history":       nil,
-			"registry":      nil,
-			"job":           nil,
-		},
-	}
-}
-
-func WithStorage(opts ...*RepositoryOption) (store.Repository, error) {
-	options := map[string]repositoryOptFn{
-		"request_queue": nil,
-		"url":           nil,
-		"history":       nil,
-		"registry":      nil,
-		"job":           nil,
+func (o *RepositoryOption) Apply() {
+	if o.apply == nil {
+		panic("apply is not defined")
+		return
 	}
 
-	for _, opt := range opts {
-		if opt.err != nil {
-			return nil, opt.err
-		}
-
-		for key, o := range opt.options {
-			if o != nil {
-				options[key] = o
-			}
-		}
-	}
-
-	s := newStorage(
-		options["request_queue"],
-		options["url"],
-		options["history"],
-		options["registry"],
-		options["job"],
-	)
-
-	return s, nil
-}
-
-func Client() *clientOpt {
-	return new(clientOpt)
-}
-
-func newStorage(opts ...repositoryOptFn) store.Repository {
-	s := &repositoryOpt{}
-
-	for _, o := range opts {
-		o(s)
-	}
-
-	return s
+	o.apply(o)
 }

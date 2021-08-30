@@ -2,9 +2,11 @@ package mgostore
 
 import (
 	"context"
+	"encoding/json"
 
 	metav1 "crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/store"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -22,31 +24,42 @@ func NewRequestQueueRepository(coll *mongo.Collection) store.RequestQueue {
 	return rq
 }
 
-func (rq *requestQueue) List(ctx context.Context, query metav1.RequestQueueListQuery) {
-	//elastic.NewTermQuery().Source()
-	//bq := elastic.NewBoolQuery()
-	//bq.Must(
-	//	elastic.NewTermQuery("a", "ac"),
-	//)
-	//bq.Must(
-	//	elastic.NewTermQuery(&metav1.RequestQueue{
-	//		RunID: String("abc"),
-	//		//URL:   "",
-	//	}),c
-	//)
+func (rq *requestQueue) List(ctx context.Context, filter *metav1.RequestQueueListFilter) ([]*metav1.RequestQueue, error) {
+	query := bson.M{}
 
-	abc := func(c interface{}) {
+	var queryFilters map[string]interface{}
 
+	filterB, _ := json.Marshal(filter)
+	if err := json.Unmarshal(filterB, &queryFilters); err != nil {
+		return nil, err
 	}
 
-	abc(&metav1.RequestQueueCreate{
-		RunID: String("abc"),
-	})
-
-	panic("implement me")
+	for key, f := range queryFilters {
+		switch filter := f.(type) {
+		case *metav1.StringFilter:
+			query[key] = filter.Is
+		}
+	}
 
 	// TODO: translate query to mongo
-	rq.coll.Find(context.Background(), query)
+	cursor, err := rq.coll.Find(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var nodes []*metav1.RequestQueue
+
+	for cursor.Next(ctx) {
+		var node metav1.RequestQueue
+
+		if err := cursor.Decode(&node); err != nil {
+			return nil, err
+		}
+
+		nodes = append(nodes, &node)
+	}
+
+	return nodes, err
 }
 
 func (rq *requestQueue) InsertMany(ctx context.Context, queues []*metav1.RequestQueueCreate) ([]string, error) {

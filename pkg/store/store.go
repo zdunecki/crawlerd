@@ -5,13 +5,14 @@ import (
 	"time"
 
 	metav1 "crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/runner"
 )
 
 // TODO: aliases - needed for multi-tenant in same collection
 
+// TODO: build cache layer for fast retrieving
+// TODO: don't mix request queue for seed and search engine
 type RequestQueue interface {
-	List(ctx context.Context, options *metav1.RequestQueueListQuery)
+	List(ctx context.Context, filters *metav1.RequestQueueListFilter) ([]*metav1.RequestQueue, error)
 
 	InsertMany(context.Context, []*metav1.RequestQueueCreate) ([]string, error)
 }
@@ -23,7 +24,7 @@ type Linker interface {
 }
 
 // TODO: better name
-// Deprecated: URL is now RequestQueue
+// Deprecated: URL is now Linker
 type URL interface {
 	Scroll(context.Context, func([]metav1.URL)) error
 
@@ -44,6 +45,7 @@ type History interface {
 	InsertOne(ctx context.Context, id int, response []byte, duration time.Duration, createdAt time.Time) (bool, int, error)
 }
 
+// Deprecated: Registry is now RequestQueue
 type Registry interface {
 	GetURLByID(context.Context, int) (*metav1.CrawlURL, error)
 
@@ -61,9 +63,30 @@ type Job interface {
 
 	PatchOneByID(ctx context.Context, id string, job *metav1.JobPatch) error
 
-	Functions() runner.Functions
+	Functions() Functions
 }
 
+type Runner interface {
+	List(context.Context) ([]*metav1.Runner, error)
+
+	GetByID(context.Context, string) (*metav1.Runner, error)
+
+	Create(context.Context, *metav1.RunnerCreate) (string, error)
+
+	UpdateByID(context.Context, string, *metav1.RunnerPatch) error
+}
+
+type Functions interface {
+	// GetByID getting function by id and return their content
+	GetByID(context.Context, string) (string, error)
+}
+
+// RunnerFunctions is store repository for persistence operations on JavaScript functions
+type RunnerFunctions interface {
+	Functions
+}
+
+// TODO: different name than Repository?
 type Repository interface {
 	RequestQueue() RequestQueue
 	Linker() Linker
@@ -71,5 +94,6 @@ type Repository interface {
 	History() History
 	Registry() Registry
 	Job() Job
-	Runner() runner.Runner
+	Runner() Runner
+	RunnerFunctions() RunnerFunctions
 }

@@ -11,8 +11,8 @@ import (
 	v1 "crawlerd/api/v1"
 	"crawlerd/api/v1/client"
 	runnerv1 "crawlerd/pkg/runner/api/v1"
-	"crawlerd/pkg/runner/testkit"
 	"crawlerd/pkg/store"
+	storeOptions "crawlerd/pkg/store/options"
 	"github.com/go-chi/chi/v5"
 	"github.com/orlangure/gnomock"
 	mongopreset "github.com/orlangure/gnomock/preset/mongo"
@@ -25,7 +25,7 @@ func randomPort() string {
 	return fmt.Sprintf("%d", rand.Intn(max-min)+min)
 }
 
-func testMongoDBAPI() (v1.V1, store.Repository, func(), error) {
+func testMongoDBAPI() (v1.V1, store.Repository, *storeOptions.RepositoryOption, func(), error) {
 	mgoPreset := mongopreset.Preset()
 	mongoContainer, err := gnomock.Start(mgoPreset)
 
@@ -35,7 +35,7 @@ func testMongoDBAPI() (v1.V1, store.Repository, func(), error) {
 
 	if err != nil {
 		done()
-		return nil, nil, func() {
+		return nil, nil, nil, func() {
 
 		}, err
 	}
@@ -45,14 +45,18 @@ func testMongoDBAPI() (v1.V1, store.Repository, func(), error) {
 	mongoDBName := "test"
 	mongoURI := fmt.Sprintf("mongodb://%s", mongoContainer.DefaultAddress())
 
+	storeOptions := storeOptions.
+		Client().
+		WithMongoDB(mongoDBName, options.Client().ApplyURI(mongoURI))
+
 	apiV1, err := v1.New(
-		v1.WithMongoDBStorage(mongoDBName, options.Client().ApplyURI(mongoURI)),
+		v1.WithStore(storeOptions),
 		v1.WithGRPCSchedulerServer(schedulerGRPCAddr),
 	)
 
 	if err != nil {
 		done()
-		return nil, nil, func() {
+		return nil, nil, nil, func() {
 
 		}, err
 	}
@@ -83,16 +87,14 @@ func testMongoDBAPI() (v1.V1, store.Repository, func(), error) {
 
 	c, err := client.NewWithOpts(client.WithHTTPAddr("http://localhost" + appAddr))
 
-	return c, apiV1.Store(), done, nil
+	return c, apiV1.Store(), storeOptions, done, nil
 }
 
-func testRunner(getFunction testkit.GetFn, handler http.HandlerFunc, store store.Repository) (runnerv1.V1, string, error) {
-	runnerStore := testkit.NewTestStore(getFunction, store)
-
+func testRunner(handler http.HandlerFunc, store store.Repository) (runnerv1.V1, string, error) {
 	addr := ":7777"
 
 	go func() {
-		runnerv1.New(addr, runnerStore, runnerv1.Config{
+		runnerv1.New(addr, store, runnerv1.Config{
 			APIURL: "http://localhost:8080/v1",
 		}).ListenAndServe()
 	}()

@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"path"
 
-	"crawlerd/pkg/runner"
+	"crawlerd/pkg/store"
 )
 
 type pluginsRepository struct {
@@ -25,16 +25,40 @@ type fakeStorage struct {
 	pluginsRepository *pluginsRepository
 }
 
-func newFakeStorage() runner.Store {
+func newFakeStorage() store.Repository {
 	return &fakeStorage{
 		pluginsRepository: &pluginsRepository{},
 	}
 }
 
-func (s *fakeStorage) Functions() runner.Functions {
-	return s.pluginsRepository
+func (s *fakeStorage) RequestQueue() store.RequestQueue {
+	return nil
 }
 
-func (s *fakeStorage) Runner() runner.Runner {
-	panic("implement me")
+func (s *fakeStorage) Linker() store.Linker {
+	return nil
+}
+
+func (s *fakeStorage) URL() store.URL {
+	return nil
+}
+
+func (s *fakeStorage) History() store.History {
+	return nil
+}
+
+func (s *fakeStorage) Registry() store.Registry {
+	return nil
+}
+
+func (s *fakeStorage) Job() store.Job {
+	return nil
+}
+
+func (s *fakeStorage) Runner() store.Runner {
+	return nil
+}
+
+func (s *fakeStorage) RunnerFunctions() store.RunnerFunctions {
+	return s.pluginsRepository
 }

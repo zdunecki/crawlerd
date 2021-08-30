@@ -33,6 +33,9 @@ type RunnerEngineList []RunnerEngine
 
 var RunnerEngineListAll RunnerEngineList = []RunnerEngine{RunnerEngineJavaScript, RunnerEngineChromium, RunnerEngineCrawlBot}
 
+// RunnerInitialDepth is start depth value, should be counter from 1.
+const RunnerInitialDepth = 1
+
 type Runner struct {
 	ID string `json:"id" bson:"_id"`
 
@@ -41,6 +44,9 @@ type Runner struct {
 	EndAt int `json:"end_at" bson:"end_at"`
 
 	Status RunnerStatus `json:"status" bson:"status"`
+
+	// Depth current depth, not greater than RunnerUpCreate.MaxDepth.
+	Depth uint `json:"depth" bson:"depth"`
 }
 
 type RunnerCreate struct {
@@ -49,20 +55,38 @@ type RunnerCreate struct {
 	EndAt int `json:"end_at" bson:"end_at,omitempty"`
 
 	Status RunnerStatus `json:"status" bson:"status"`
+
+	Depth uint `json:"depth" bson:"depth"`
 }
 
 type RunnerPatch struct {
 	EndAt int `json:"end_at" bson:"end_at,omitempty"`
 
 	Status RunnerStatus `json:"status" bson:"status,omitempty"`
+
+	Depth uint `json:"depth" bson:"depth"`
 }
 
 type RunnerUpCreate struct {
 	// ID is an identifier helpful to find runner config/functions etc.
 	ID string `json:"id"`
 
-	// URL is an url to crawled page by runner
+	// URL is a page url where runner should crawl.
 	URL string `json:"url"`
+
+	// ScrapeLinksPattern is a regexp pattern in which links should be scraped, useful for narrow down results.
+	// If not defined, then match all.
+	ScrapeLinksPattern string `json:"scrape_links_pattern"`
+
+	// FollowLinks which links should be crawled deeper.
+	// If not defined, then follow all links.
+	// Applied only if MaxDepth is
+	FollowLinks []*StringFilter `json:"follow_links"`
+
+	// MaxDepth how deep FollowLinks should be, counted from first run.
+	// Should be greater than or equal RunnerInitialDepth.
+	// By default, if not specified then runner crawl just once, even if FollowLinks is defined.
+	MaxDepth uint `json:"max_depth"`
 }
 
 type Job struct {
@@ -123,13 +147,8 @@ func (j *JobPatch) ApplyJob(job *Job) {
 	}
 }
 
+// TODO: add status to avoid infinite
 type RequestQueue struct {
-	RunID string `json:"run_id"`
-
-	URL string `json:"url" bson:"url"`
-}
-
-type RequestQueueListQuery struct {
 	RunID string `json:"run_id"`
 
 	URL string `json:"url" bson:"url"`
@@ -139,6 +158,12 @@ type RequestQueueCreate struct {
 	RunID string `json:"run_id"`
 
 	URL string `json:"url" bson:"url"`
+}
+
+type RequestQueueListFilter struct {
+	RunID *StringFilter `json:"run_id" bson:"run_id"`
+
+	URL *StringFilter `json:"url" bson:"url"`
 }
 
 type LinkURL string

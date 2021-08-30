@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -19,8 +18,6 @@ import (
 	"crawlerd/api"
 	"crawlerd/crawlerdpb"
 	metav1 "crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/runner"
-	runnerv1 "crawlerd/pkg/runner/api/v1"
 	"crawlerd/pkg/store"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -37,9 +34,9 @@ const (
 	IntervalMinValue = 5
 )
 
+// TODO: routes
 type v1 struct {
-	store       store.Repository
-	runnerStore runner.Store
+	store store.Repository
 
 	scheduler crawlerdpb.SchedulerClient
 
@@ -258,26 +255,6 @@ func Unpack(bucketName string, bucket *blob.Bucket, dstDir string, r io.Reader, 
 	}
 }
 
-type runnerStore struct {
-	runner    runner.Runner
-	functions runner.Functions
-}
-
-func NewRunnerStore(s store.Repository) runner.Store {
-	return &runnerStore{
-		runner:    s.Runner(),
-		functions: s.Job().Functions(),
-	}
-}
-
-func (r runnerStore) Runner() runner.Runner {
-	return r.runner
-}
-
-func (r runnerStore) Functions() runner.Functions {
-	return r.functions
-}
-
 func New(opts ...Option) (*v1, error) {
 	v := &v1{
 		log: log.WithFields(map[string]interface{}{
@@ -298,8 +275,6 @@ func New(opts ...Option) (*v1, error) {
 
 		v.schedulerBackoff = bo
 	}
-
-	v.runnerStore = NewRunnerStore(v.store)
 
 	return v, nil
 }
@@ -344,7 +319,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		data, err := ioutil.ReadAll(c.Request().Body)
 		if err != nil {
 			v.log.Error(err)
-			c.InternalError()
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -358,9 +335,12 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			linkNodes := make([]*metav1.LinkNodeCreate, len(req))
 
 			for i, r := range req {
-				if r.Validate() != nil {
+				if err := r.Validate(); err != nil {
 					v.log.Error(err)
-					c.BadRequest().JSON("validation error")
+					c.BadRequest().JSON(&APIError{
+						Type:    ErrorTypeValidation,
+						Message: err.Error(),
+					})
 					return
 				}
 
@@ -369,20 +349,22 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 				}
 			}
 
-			insertedIds, err := v.store.Linker().InsertManyIfNotExists(c.RequestContext(), linkNodes)
+			_, err := v.store.Linker().InsertManyIfNotExists(c.RequestContext(), linkNodes)
 			if err != nil {
 				v.log.Error(err)
-				c.InternalError()
+				c.InternalError().JSON(&APIError{
+					Type: ErrorTypeInternal,
+				})
 				return
 			}
-
-			fmt.Println(insertedIds)
 		}
 
 		ids, err := v.store.RequestQueue().InsertMany(c.RequestContext(), req)
 		if err != nil {
 			v.log.Error(err)
-			c.InternalError()
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -402,7 +384,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		if err != nil {
 			v.log.Error(err)
-			ctx.InternalError()
+			ctx.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -421,7 +405,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		if err != nil {
 			v.log.Error(err)
-			ctx.InternalError()
+			ctx.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -464,7 +450,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		if err != nil {
 			log.Error(err)
-			ctx.InternalError()
+			ctx.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -480,7 +468,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		})
 		if err != nil {
 			v.log.Error(err)
-			ctx.InternalError()
+			ctx.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -517,7 +507,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		if err != nil {
 			v.log.Error(err)
-			ctx.InternalError()
+			ctx.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -564,7 +556,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		history, err := v.store.History().FindByID(ctx.RequestContext(), id)
 		if err != nil {
 			v.log.Error(err)
-			ctx.InternalError()
+			ctx.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -585,7 +579,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		wd, err := os.Getwd()
 		if err != nil {
 			v.log.Error(err)
-			ctx.InternalError().JSON("something went wrong")
+			ctx.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -593,7 +589,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		//err = Unpack(bucket, ctx.Request().Body)
 		if err != nil {
 			v.log.Error(err)
-			ctx.InternalError().JSON("something went wrong")
+			ctx.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -605,19 +603,25 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		if err := c.Bind(req); err != nil {
 			v.log.Error(err)
-			c.InternalError().JSON("something went wrong")
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
 		if err := req.Validate(); err != nil {
 			v.log.Error(err)
-			c.InternalError().JSON("validation error")
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeValidation,
+			})
 			return
 		}
 
 		if id, err := v.store.Job().InsertOne(context.TODO(), req); err != nil {
 			v.log.Error(err)
-			c.InternalError().JSON("something went wrong")
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		} else {
 			c.JSON(map[string]string{
@@ -629,7 +633,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 	v1.Get("/v1/jobs", func(c api.Context) {
 		if jobs, err := v.store.Job().FindAll(context.TODO()); err != nil {
 			v.log.Error(err)
-			c.InternalError().JSON("something went wrong")
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		} else {
 			c.JSON(jobs)
@@ -641,7 +647,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		if job, err := v.store.Job().FindOneByID(context.TODO(), id); err != nil {
 			v.log.Error(err)
-			c.InternalError().JSON("something went wrong")
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		} else {
 			c.JSON(job)
@@ -653,7 +661,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		if err := c.Bind(req); err != nil {
 			v.log.Error(err)
-			c.InternalError().JSON("something went wrong")
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -661,21 +671,27 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		if job, err := v.store.Job().FindOneByID(context.TODO(), id); err != nil {
 			v.log.Error(err)
-			c.InternalError().JSON("something went wrong")
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		} else {
 			req.ApplyJob(job)
 
 			if err := req.Validate(); err != nil {
 				v.log.Error(err)
-				c.InternalError().JSON("validation error")
+				c.BadRequest().JSON(&APIError{
+					Type: ErrorTypeValidation,
+				})
 				return
 			}
 		}
 
 		if err := v.store.Job().PatchOneByID(context.TODO(), id, req); err != nil {
 			v.log.Error(err)
-			c.InternalError().JSON("something went wrong")
+			c.InternalError().JSON(&APIError{
+				Type: ErrorTypeInternal,
+			})
 			return
 		}
 
@@ -696,10 +712,6 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 
 		ctx.JSON(nodes)
 	})
-
-	runner := runnerv1.New(":9888", v.runnerStore, runnerv1.Config{})
-
-	go runner.ListenAndServe()
 
 	v.log.Info("listening on: ", addr)
 	return http.ListenAndServe(addr, v1.Handler())

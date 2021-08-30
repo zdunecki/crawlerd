@@ -4,7 +4,6 @@ import (
 	"context"
 
 	metav1 "crawlerd/pkg/meta/v1"
-	runnerstorage "crawlerd/pkg/runner"
 	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -91,6 +90,6 @@ func (j *job) PatchOneByID(ctx context.Context, id string, job *metav1.JobPatch)
 	return err
 }
 
-func (j *job) Functions() runnerstorage.Functions {
+func (j *job) Functions() store.Functions {
 	return j.jobFunctions
 }

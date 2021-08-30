@@ -1,29 +1,12 @@
 package etcdstore
 
 import (
-	"crawlerd/pkg/runner"
 	"crawlerd/pkg/store"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type etcd struct {
 	registryRepo store.Registry
-}
-
-func (e etcd) Runner() runner.Runner {
-	panic("implement me")
-}
-
-func (e etcd) RequestQueue() store.RequestQueue {
-	panic("implement me")
-}
-
-func (e etcd) Linker() store.Linker {
-	panic("implement me")
-}
-
-func (e etcd) Job() store.Job {
-	panic("implement me")
 }
 
 type Storage interface {
@@ -48,4 +31,24 @@ func (e etcd) History() store.History {
 
 func (e etcd) Registry() store.Registry {
 	return e.registryRepo
+}
+
+func (e etcd) RunnerFunctions() store.RunnerFunctions {
+	return nil
+}
+
+func (e etcd) Runner() store.Runner {
+	return nil
+}
+
+func (e etcd) RequestQueue() store.RequestQueue {
+	return nil
+}
+
+func (e etcd) Linker() store.Linker {
+	return nil
+}
+
+func (e etcd) Job() store.Job {
+	return nil
 }

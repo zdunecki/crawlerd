@@ -4,7 +4,7 @@ import (
 	"context"
 
 	metav1 "crawlerd/pkg/meta/v1"
-	"crawlerd/pkg/runner"
+	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -15,7 +15,7 @@ type runnerRepo struct {
 	coll *mongo.Collection
 }
 
-func NewRunnerRepository(coll *mongo.Collection) runner.Runner {
+func NewRunnerRepository(coll *mongo.Collection) store.Runner {
 	r := &runnerRepo{
 		coll: coll,
 	}
@@ -79,6 +79,6 @@ func (r *runnerRepo) Create(ctx context.Context, create *metav1.RunnerCreate) (s
 func (r *runnerRepo) UpdateByID(ctx context.Context, id string, patch *metav1.RunnerPatch) error {
 	objID, _ := primitive.ObjectIDFromHex(id)
 
-	_, err := r.coll.UpdateByID(ctx, objID,  bson.M{"$set": patch})
+	_, err := r.coll.UpdateByID(ctx, objID, bson.M{"$set": patch})
 	return err
 }

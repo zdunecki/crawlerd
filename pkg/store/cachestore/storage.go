@@ -1,28 +1,11 @@
 package cachestore
 
 import (
-	"crawlerd/pkg/runner"
 	"crawlerd/pkg/store"
 )
 
 type cachestorage struct {
 	registryRepo store.Registry
-}
-
-func (c *cachestorage) Runner() runner.Runner {
-	panic("implement me")
-}
-
-func (c *cachestorage) RequestQueue() store.RequestQueue {
-	panic("implement me")
-}
-
-func (c *cachestorage) Linker() store.Linker {
-	panic("implement me")
-}
-
-func (c *cachestorage) Job() store.Job {
-	panic("implement me")
 }
 
 type Storage interface {
@@ -47,4 +30,25 @@ func (c *cachestorage) History() store.History {
 
 func (c *cachestorage) Registry() store.Registry {
 	return c.registryRepo
+}
+
+func (c *cachestorage) RunnerFunctions() store.RunnerFunctions {
+	return nil
+}
+
+func (c *cachestorage) Runner() store.Runner {
+	return nil
+
+}
+
+func (c *cachestorage) RequestQueue() store.RequestQueue {
+	return nil
+}
+
+func (c *cachestorage) Linker() store.Linker {
+	return nil
+}
+
+func (c *cachestorage) Job() store.Job {
+	return nil
 }

@@ -18,7 +18,7 @@ require (
 	github.com/json-iterator/go v1.1.10
 	github.com/nats-io/nats-server/v2 v2.2.3
 	github.com/nats-io/nats.go v1.11.0
-	github.com/olivere/elastic/v7 v7.0.27
+	github.com/olivere/elastic/v7 v7.0.27 // indirect
 	github.com/orlangure/gnomock v0.15.0
 	github.com/segmentio/kafka-go v0.4.16
 	github.com/sirupsen/logrus v1.8.1
@@ -35,4 +35,5 @@ require (
 	k8s.io/api v0.21.2
 	k8s.io/apimachinery v0.21.2
 	k8s.io/client-go v0.21.2
+	rogchap.com/v8go v0.6.0
 )

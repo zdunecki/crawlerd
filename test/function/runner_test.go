@@ -10,7 +10,7 @@ import (
 )
 
 // TODO: esbuild tests
-
+// TODO: fix tests after refactor
 func TestRunner(t *testing.T) {
 	var functions = map[string]string{
 		"test1": `
@@ -34,7 +34,9 @@ func TestRunner(t *testing.T) {
 		w.Write([]byte("hello"))
 	})
 
-	c, addr, err := testRunner(getFunction, handler, nil)
+	getFunction(nil, "")
+
+	c, addr, err := testRunner(handler, nil)
 	if err != nil {
 		t.Error(err)
 		return
