@@ -11,7 +11,7 @@ import (
 
 // TODO: bundle react without node_modules
 // TODO: speedup improvement (cache) - jsxData should not compile code every time even if jsx code didn't changed
-func jsxData(jsxFile string, props map[string]string, out interface{}) error {
+func jsxData(jsxFile string, props interface{}, out interface{}) error {
 	var compiledCode []byte
 
 	iifeVariable := "test"

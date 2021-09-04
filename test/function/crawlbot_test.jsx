@@ -7,7 +7,8 @@ const internalLink1Link = "/" + internalLink1Name
 const internalLink2Name = "cool-article"
 const internalLink2Link = "/" + internalLink2Name
 
-const externalServer1URL = "http://url-to-another-server:8282"
+// const externalServer1URL = "http://url-to-another-server:8282"
+const externalServer1URL = "http://localhost:8282"
 
 function PageWithOneInternalLink({internalLinkName}) {
     return <html>
@@ -55,43 +56,83 @@ function PageWithInternalAndExternalLink({internalLinkName}) {
     </html>
 }
 
-// TODO: more boust expect, like {links: [], requestToPages: []}
-export function TestData({fakeServer}) {
+// TODO: more robust expect, like {links: [], requestToPages: []}
+// TODO:: outside_network should be checked only on backend side
+//
+export function TestData({rootServer}) {
     return [
-        // {
-        //     description: "two",
-        //     max_depth: 2,
-        //     pages: {
-        //         [fakeServer + internalLink1Link]: html(<PageWithNoLinks/>),
-        //         [externalServer1URL]: html(<PageWithOneInternalLink internalLinkName={internalLink2Name}/>),
-        //         [fakeServer + internalLink2Link]: html(<PageWithNoLinks/>),
-        //     },
-        //     url: fakeServer + "/some-url",
-        //     body: html(<PageWithInternalAndExternalLink
-        //         internalLinkName={internalLink1Name}
-        //     />),
-        //     expect: [
-        //         fakeServer + internalLink1Link,
-        //         externalServer1URL,
-        //         fakeServer + internalLink2Link
-        //     ]
-        // },
         {
-            url: fakeServer + "/some-url",
-            description: "one",
+            start_url: rootServer + "/some-url",
+            description: "one depth only",
             max_depth: 1,
-            body: html(<PageWithInternalAndExternalLink
-                internalLinkName={internalLink1Name}
-            />),
             pages: {
-                [fakeServer + internalLink1Link]: html(<PageWithNoLinks/>),
-                [externalServer1URL]: html(<PageWithOneInternalLink internalLinkName={internalLink2Name}/>),
-                [fakeServer + internalLink2Link]: html(<PageWithNoLinks/>),
+                [rootServer + "/some-url"]: {
+                    body: html(<PageWithInternalAndExternalLink
+                        internalLinkName={internalLink1Name}
+                    />)
+                },
+                [rootServer + internalLink1Link]: {
+                    body: html(<PageWithNoLinks/>)
+                },
+                [rootServer + internalLink2Link]: {
+                    body: html(<PageWithNoLinks/>),
+                },
+                [externalServer1URL]: {
+                    body: html(<PageWithOneInternalLink internalLinkName={internalLink2Name}/>),
+                    // outside_network: true,
+                },
             },
             expect: [
-                fakeServer + internalLink1Link,
+                rootServer + internalLink1Link,
                 externalServer1URL
+            ]
+        },
+        {
+            start_url: rootServer + "/some-url",
+            description: "one depth only",
+            max_depth: 2,
+            pages: {
+                [rootServer + "/some-url"]: {
+                    body: html(<PageWithInternalAndExternalLink
+                        internalLinkName={internalLink1Name}
+                    />)
+                },
+                [rootServer + internalLink1Link]: {
+                    body: html(<PageWithNoLinks/>)
+                },
+                [rootServer + internalLink2Link]: {
+                    body: html(<PageWithNoLinks/>),
+                },
+                [externalServer1URL]: {
+                    body: html(<PageWithOneInternalLink internalLinkName={internalLink2Name}/>),
+                    // outside_network: true,
+                },
+            },
+            expect: [
+                rootServer + internalLink1Link,
+                externalServer1URL
+            ]
+        },
+        {
+            start_url: rootServer + "/some-url",
+            description: "one depth only",
+            max_depth: 2,
+            pages: {
+                [rootServer + "/some-url"]: {
+                    body: html(<PageWithInternalAndExternalLink
+                        internalLinkName={internalLink1Name}
+                    />)
+                },
+                [rootServer + internalLink1Link]: {
+                    body: html(<PageWithOneInternalLink internalLinkName={internalLink2Name}/>)
+                }
+            },
+            expect: [
+                rootServer + internalLink1Link,
+                externalServer1URL,
+                rootServer + internalLink2Link
             ]
         }
     ]
 }
+

@@ -34,7 +34,7 @@ type RunnerEngineList []RunnerEngine
 var RunnerEngineListAll RunnerEngineList = []RunnerEngine{RunnerEngineJavaScript, RunnerEngineChromium, RunnerEngineCrawlBot}
 
 // RunnerInitialDepth is start depth value, should be counter from 1.
-const RunnerInitialDepth = 1
+const RunnerInitialDepth uint = 1
 
 type Runner struct {
 	ID string `json:"id" bson:"_id"`

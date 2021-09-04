@@ -9,8 +9,8 @@ import (
 func TestJSXData(t *testing.T) {
 	var testCase []CrawlBotTestCase
 
-	props := map[string]string{
-		"fakeServer": "http://localhost:6666",
+	props := &CrawlBotTestProps{
+		RootServer: "http://localhost:6666",
 	}
 
 	if err := jsxData("crawlbot_test.jsx", props, &testCase); err != nil {
@@ -23,17 +23,12 @@ func TestJSXData(t *testing.T) {
 		return
 	}
 
-	if testCase[0].Body == "" {
-		t.Error("body should be never be empty")
+	if testCase[0].StartURL == "" {
+		t.Error("start url should be never be empty")
 		return
 	}
 
-	if testCase[0].URL == "" {
-		t.Error("url should be never be empty")
-		return
-	}
-
-	if !strings.Contains(testCase[0].URL, props["fakeServer"]) {
+	if !strings.Contains(testCase[0].StartURL, props.RootServer) {
 		t.Error("url should contain fake server")
 		return
 	}

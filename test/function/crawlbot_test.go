@@ -4,15 +4,21 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	metav1 "crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/runner/testkit"
 	"crawlerd/test"
+	"gopkg.in/h2non/gock.v1"
 )
 
 func TestCrawlBot(t *testing.T) {
+	defer gock.Off()
+
 	var testCases []CrawlBotTestCase
 
 	runID := "test1"
@@ -34,35 +40,122 @@ func TestCrawlBot(t *testing.T) {
 	api, store, storeOptions, done, err := testMongoDBAPI()
 	defer done()
 
-	handlerBody := "" // TODO: it's not a concurrent solution
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(handlerBody))
-	})
-
 	rf := testkit.NewTestRunnerFunctions(getFunction)
 	storeOptions.CustomRunnerFunctions(rf).Apply()
 
-	runner, fakeServerURL, err := testRunner(handler, store)
+	runner, err := testRunner(store)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	props := map[string]string{
-		"fakeServer": fakeServerURL,
+	type fakeServer struct {
+		Handler http.HandlerFunc
+		Bodies  map[string]string
 	}
+
+	fakeServers := make(map[string]*fakeServer)
+
+	fakeServerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if server, ok := fakeServers[r.Host]; !ok {
+			return
+		} else {
+			if body, ok := server.Bodies["http://"+r.Host+r.RequestURI]; ok {
+				w.Write([]byte(body))
+			}
+		}
+	})
+
+	fakeRootServer := httptest.NewServer(fakeServerHandler)
+	fakeRootServerURL, err := url.Parse(fakeRootServer.URL)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fakeServers[fakeRootServerURL.Host] = &fakeServer{
+		Handler: fakeServerHandler,
+		Bodies:  make(map[string]string),
+	}
+
+	props := &CrawlBotTestProps{
+		RootServer: fakeRootServer.URL,
+	}
+
+	fmt.Println(fakeRootServerURL.Host)
+
 	if err := jsxData("crawlbot_test.jsx", props, &testCases); err != nil {
 		t.Error(err)
 		return
 	}
 
 	for _, testCase := range testCases {
-		handlerBody = testCase.Body
+		for u, page := range testCase.Pages {
+			pageURL, err := url.Parse(u)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+
+			// TODO: http mock
+			if _, ok := fakeServers[pageURL.Host]; !ok {
+				if page.OutsideNetwork {
+					//server, ok := fakeServers[pageURL.Host]
+					//
+					if !ok {
+						fakeServers[pageURL.Host] = &fakeServer{
+							Handler: fakeServerHandler,
+							Bodies:  make(map[string]string),
+						}
+					}
+
+					// TODO: for some reason gock mock also another requests (request to runner)
+					//gock.New(pageURL.Scheme + "//" + pageURL.Host).
+					//	Get(pageURL.Path).
+					//	Filter(func(request *http.Request) bool { // avoid issues with mocking outside requests
+					//		return server != nil
+					//	}).
+					//	Map(func(r *http.Request) *http.Request {
+					//		if body, ok := server.Bodies[r.URL.String()]; ok {
+					//			r.Response.Body = ioutil.NopCloser(strings.NewReader(body))
+					//		}
+					//
+					//		return r
+					//	})
+
+				} else {
+					l, err := net.Listen("tcp", pageURL.Host)
+					if err != nil {
+						t.Error(err)
+						return
+					}
+
+					ts := httptest.NewUnstartedServer(fakeServerHandler)
+					ts.Listener.Close()
+					ts.Listener = l
+					ts.Start()
+
+					//newFakeServerURL, err := url.Parse(u)
+					//if err != nil {
+					//	t.Error(err)
+					//	return
+					//}
+					fakeServers[pageURL.Host] = &fakeServer{
+						Handler: fakeServerHandler,
+						Bodies:  make(map[string]string),
+					}
+				}
+			}
+
+			pURL := pageURL.String()
+			server := fakeServers[pageURL.Host]
+
+			server.Bodies[pURL] = page.Body
+		}
 
 		{
 			_, err := runner.Run(&metav1.RunnerUpCreate{
 				ID:       runID,
-				URL:      props["fakeServer"] + "/some-url",
+				URL:      testCase.StartURL,
 				MaxDepth: testCase.MaxDepth,
 			})
 

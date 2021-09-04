@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"net/http/httptest"
 	"time"
 
 	"crawlerd/api"
@@ -90,7 +89,7 @@ func testMongoDBAPI() (v1.V1, store.Repository, *storeOptions.RepositoryOption, 
 	return c, apiV1.Store(), storeOptions, done, nil
 }
 
-func testRunner(handler http.HandlerFunc, store store.Repository) (runnerv1.V1, string, error) {
+func testRunner(store store.Repository) (runnerv1.V1, error) {
 	addr := ":7777"
 
 	go func() {
@@ -103,9 +102,7 @@ func testRunner(handler http.HandlerFunc, store store.Repository) (runnerv1.V1, 
 		Timeout: time.Second * 60,
 	})
 
-	s := httptest.NewServer(handler)
-
 	time.Sleep(time.Second)
 
-	return c, s.URL, nil
+	return c, nil
 }

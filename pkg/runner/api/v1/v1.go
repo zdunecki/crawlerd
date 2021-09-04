@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -106,10 +107,12 @@ func (v1 *v1) run(c api.Context) {
 	rqs := v1.store.RequestQueue()
 	rfs := v1.store.RunnerFunctions()
 
+	currentDepth := metav1.RunnerInitialDepth
+
 	runID, err := rs.Create(c.RequestContext(), &metav1.RunnerCreate{
 		RunAt:  util.NowInt(),
 		Status: metav1.RunnerStatusQueued,
-		Depth:  metav1.RunnerInitialDepth,
+		Depth:  currentDepth,
 	})
 
 	if err != nil {
@@ -129,6 +132,7 @@ func (v1 *v1) run(c api.Context) {
 	//}...)
 	//ctx, cancel = chromedp.NewContext(ctx)
 
+	// TODO: speedup (it should not run in pool or something else)
 	crawl := func(pageURL string) (interface{}, error) {
 		var res interface{}
 
@@ -197,13 +201,17 @@ func (v1 *v1) run(c api.Context) {
 
 	firstRunAndFinal := metav1.RunnerInitialDepth >= req.MaxDepth
 
-	if firstRunAndFinal {
-		// TODO: how to determine failed status
+	runSuccessed := func() error {
+		// TODO: how to determine failed status (gotException inside crawl?)
 		// TODO: timeout status
-		if err := rs.UpdateByID(c.RequestContext(), runID, &metav1.RunnerPatch{
+		return rs.UpdateByID(c.RequestContext(), runID, &metav1.RunnerPatch{
 			EndAt:  util.NowInt(),
 			Status: metav1.RunnerStatusSuccessed,
-		}); err != nil {
+		})
+	}
+
+	if firstRunAndFinal {
+		if err := runSuccessed(); err != nil {
 			v1.log.Error(err)
 
 			c.InternalError().JSON(apiv1.APIError{
@@ -227,8 +235,37 @@ func (v1 *v1) run(c api.Context) {
 			return
 		}
 
-		fmt.Println(deeperQueues)
-		// TODO: crawl deeper
+		// TODO: distributed request queue
+		for _, q := range deeperQueues {
+			if currentDepth >= req.MaxDepth {
+				if err := runSuccessed(); err != nil {
+					v1.log.Error(err)
+
+					c.InternalError().JSON(apiv1.APIError{
+						Type: apiv1.ErrorTypeInternal,
+					})
+					return
+				}
+				continue
+			}
+
+			// TODO: retry
+			if _, err := crawl(q.URL); err != nil {
+				v1.log.Error(err)
+				continue
+			}
+
+			// TODO: if goes distributed should increment be atomic
+			currentDepth += 1
+
+			if err := rs.UpdateByID(context.Background(), runID, &metav1.RunnerPatch{
+				Depth: currentDepth,
+			}); err != nil {
+				v1.log.Error(err)
+				currentDepth -= 1
+				continue
+			}
+		}
 	}
 
 	c.JSON(map[string]interface{}{

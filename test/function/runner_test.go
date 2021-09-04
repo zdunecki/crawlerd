@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	metav1 "crawlerd/pkg/meta/v1"
@@ -30,13 +31,16 @@ func TestRunner(t *testing.T) {
 		return functions[id], nil
 	}
 
+	getFunction(nil, "")
+
+	c, err := testRunner(nil)
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello"))
 	})
+	fakeServer := httptest.NewServer(handler)
+	addr := fakeServer.URL
 
-	getFunction(nil, "")
-
-	c, addr, err := testRunner(handler, nil)
 	if err != nil {
 		t.Error(err)
 		return
