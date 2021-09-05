@@ -1,5 +1,6 @@
 const API_URL = window.CRAWLERD_API_URL || "http://localhost:8080/v1"
 const RUN_ID = window.CRAWLERD_RUN_ID || ""
+const DEPTH = window.CRAWLERD_DEPTH || ""
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -31,7 +32,8 @@ function API(token) {
                     // TODO: be sure that links are absolute
                     body.push({
                         run_id: RUN_ID,
-                        url: link
+                        url: link,
+                        depth: parseInt(DEPTH)
                     })
                 }
 

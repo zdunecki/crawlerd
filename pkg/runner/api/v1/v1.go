@@ -91,7 +91,7 @@ func (v1 *v1) ListenAndServe() {
 	}
 }
 
-// TODO: update RunnerStatus
+// TODO: ScrapeLinksPattern, FollowLinks
 func (v1 *v1) run(c api.Context) {
 	req := &metav1.RunnerUpCreate{}
 	if err := c.Bind(req); err != nil {
@@ -107,12 +107,12 @@ func (v1 *v1) run(c api.Context) {
 	rqs := v1.store.RequestQueue()
 	rfs := v1.store.RunnerFunctions()
 
-	currentDepth := metav1.RunnerInitialDepth
+	currentRunnerDepth := metav1.RunnerInitialDepth
 
 	runID, err := rs.Create(c.RequestContext(), &metav1.RunnerCreate{
 		RunAt:  util.NowInt(),
 		Status: metav1.RunnerStatusQueued,
-		Depth:  currentDepth,
+		Depth:  currentRunnerDepth,
 	})
 
 	if err != nil {
@@ -133,7 +133,7 @@ func (v1 *v1) run(c api.Context) {
 	//ctx, cancel = chromedp.NewContext(ctx)
 
 	// TODO: speedup (it should not run in pool or something else)
-	crawl := func(pageURL string) (interface{}, error) {
+	crawl := func(pageURL string, depth uint) (interface{}, error) {
 		var res interface{}
 
 		ctx, cancel := chromedp.NewContext(c.RequestContext())
@@ -164,6 +164,7 @@ func (v1 *v1) run(c api.Context) {
 		windowVariables := map[string]string{
 			"CRAWLERD_API_URL": v1.cfg.APIURL,
 			"CRAWLERD_RUN_ID":  runID,
+			"CRAWLERD_DEPTH":   fmt.Sprintf("%d", depth),
 		}
 
 		onLoadScript := ""
@@ -189,7 +190,7 @@ func (v1 *v1) run(c api.Context) {
 		return res, nil
 	}
 
-	if _, err := crawl(req.URL); err != nil {
+	if _, err := crawl(req.URL, currentRunnerDepth); err != nil {
 		v1.log.Error(err)
 
 		c.InternalError().JSON(apiv1.APIError{
@@ -220,24 +221,10 @@ func (v1 *v1) run(c api.Context) {
 			return
 		}
 	} else {
-		deeperQueues, err := rqs.List(c.RequestContext(), &metav1.RequestQueueListFilter{
-			RunID: &metav1.StringFilter{
-				Is: runID,
-			},
-		})
+		var deepCrawl func()
 
-		if err != nil {
-			v1.log.Error(err)
-
-			c.InternalError().JSON(apiv1.APIError{
-				Type: apiv1.ErrorTypeInternal,
-			})
-			return
-		}
-
-		// TODO: distributed request queue
-		for _, q := range deeperQueues {
-			if currentDepth >= req.MaxDepth {
+		deepCrawl = func() {
+			if currentRunnerDepth >= req.MaxDepth {
 				if err := runSuccessed(); err != nil {
 					v1.log.Error(err)
 
@@ -246,26 +233,64 @@ func (v1 *v1) run(c api.Context) {
 					})
 					return
 				}
-				continue
+
+				return
 			}
 
-			// TODO: retry
-			if _, err := crawl(q.URL); err != nil {
+			deeperQueues, err := rqs.List(c.RequestContext(), &metav1.RequestQueueListFilter{
+				RunID: &metav1.StringFilter{
+					Is: runID,
+				},
+				Depth: &metav1.UintFilter{
+					Is: currentRunnerDepth,
+				},
+				Status: &metav1.StringFilter{
+					Is: string(metav1.RequestQueueStatusQueued),
+				},
+			})
+			if err != nil {
 				v1.log.Error(err)
-				continue
+
+				c.InternalError().JSON(apiv1.APIError{
+					Type: apiv1.ErrorTypeInternal,
+				})
+				return
 			}
 
-			// TODO: if goes distributed should increment be atomic
-			currentDepth += 1
+			currentRunnerDepth += 1
+
+			// TODO: distributed request queue
+			// TODO: bfs
+			for _, q := range deeperQueues {
+				// TODO: retry
+				_, err := crawl(q.URL, currentRunnerDepth)
+
+				var requestQueueStatus metav1.RequestQueueStatus
+
+				if err != nil {
+					v1.log.Error(err)
+					requestQueueStatus = metav1.RequestQueueStatusFailed
+				} else {
+					requestQueueStatus = metav1.RequestQueueStatusSuccessed
+				}
+
+				if err := rqs.UpdateByID(context.Background(), q.ID, &metav1.RequestQueuePatch{
+					Status: requestQueueStatus,
+				}); err != nil {
+					v1.log.Error(err)
+				}
+			}
 
 			if err := rs.UpdateByID(context.Background(), runID, &metav1.RunnerPatch{
-				Depth: currentDepth,
+				Depth: currentRunnerDepth, // TODO: if goes distributed should increment be atomic
 			}); err != nil {
 				v1.log.Error(err)
-				currentDepth -= 1
-				continue
 			}
+
+			deepCrawl()
 		}
+
+		deepCrawl()
 	}
 
 	c.JSON(map[string]interface{}{

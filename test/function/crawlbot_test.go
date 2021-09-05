@@ -58,11 +58,18 @@ func TestCrawlBot(t *testing.T) {
 
 	fakeServerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if server, ok := fakeServers[r.Host]; !ok {
-			return
+			w.Write([]byte("no server"))
 		} else {
-			if body, ok := server.Bodies["http://"+r.Host+r.RequestURI]; ok {
-				w.Write([]byte(body))
+			host := r.Host
+			path := r.RequestURI
+			if path == "/" {
+				path = ""
 			}
+			if body, ok := server.Bodies["http://"+host+path]; ok {
+				w.Write([]byte(body))
+				return
+			}
+			w.Write([]byte("no body"))
 		}
 	})
 
@@ -89,6 +96,8 @@ func TestCrawlBot(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		t.Log(testCase.Description)
+
 		for u, page := range testCase.Pages {
 			pageURL, err := url.Parse(u)
 			if err != nil {
@@ -134,11 +143,6 @@ func TestCrawlBot(t *testing.T) {
 					ts.Listener = l
 					ts.Start()
 
-					//newFakeServerURL, err := url.Parse(u)
-					//if err != nil {
-					//	t.Error(err)
-					//	return
-					//}
 					fakeServers[pageURL.Host] = &fakeServer{
 						Handler: fakeServerHandler,
 						Bodies:  make(map[string]string),

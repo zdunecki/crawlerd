@@ -19,6 +19,16 @@ const (
 	RunnerStatusTimedOut RunnerStatus = "TimedOut"
 )
 
+type RequestQueueStatus string
+
+const (
+	RequestQueueStatusQueued RequestQueueStatus = "Queued"
+
+	RequestQueueStatusSuccessed RequestQueueStatus = "Successed"
+
+	RequestQueueStatusFailed RequestQueueStatus = "Failed"
+)
+
 type RunnerEngine string
 
 const (
@@ -149,21 +159,47 @@ func (j *JobPatch) ApplyJob(job *Job) {
 
 // TODO: add status to avoid infinite
 type RequestQueue struct {
-	RunID string `json:"run_id"`
+	ID string `json:"id" bson:"_id"`
+
+	RunID string `json:"run_id" bson:"run_id"`
 
 	URL string `json:"url" bson:"url"`
+
+	Depth uint `json:"depth" bson:"depth"`
+
+	Status RequestQueueStatus `json:"status" bson:"status"`
 }
 
 type RequestQueueCreate struct {
-	RunID string `json:"run_id"`
+	RunID string `json:"run_id" bson:"run_id"`
 
 	URL string `json:"url" bson:"url"`
+
+	Depth uint `json:"depth" bson:"depth"`
+
+	Status RequestQueueStatus `json:"status" bson:"status"`
+}
+
+type RequestQueueCreateAPI struct {
+	RunID string `json:"run_id" bson:"run_id"`
+
+	URL string `json:"url" bson:"url"`
+
+	Depth uint `json:"depth" bson:"depth"`
+}
+
+type RequestQueuePatch struct {
+	Status RequestQueueStatus `json:"status" bson:"status"`
 }
 
 type RequestQueueListFilter struct {
 	RunID *StringFilter `json:"run_id" bson:"run_id"`
 
 	URL *StringFilter `json:"url" bson:"url"`
+
+	Depth *UintFilter `json:"depth" bson:"depth"`
+
+	Status *StringFilter `json:"status" bson:"status"`
 }
 
 type LinkURL string

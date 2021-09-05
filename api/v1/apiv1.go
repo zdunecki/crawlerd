@@ -313,7 +313,8 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 	// TODO: auth
 	// TODO: batch errors
 	v1.Post("/v1/request-queue/batch", func(c api.Context) {
-		var req []*metav1.RequestQueueCreate
+		var req []*metav1.RequestQueueCreateAPI
+		rq := make([]*metav1.RequestQueueCreate, 0)
 
 		// TODO: body limitations?
 		data, err := ioutil.ReadAll(c.Request().Body)
@@ -347,6 +348,13 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 				linkNodes[i] = &metav1.LinkNodeCreate{
 					URL: metav1.NewLinkURL(r.URL),
 				}
+
+				rq = append(rq, &metav1.RequestQueueCreate{
+					RunID:  r.RunID,
+					URL:    r.URL,
+					Depth:  r.Depth,
+					Status: metav1.RequestQueueStatusQueued,
+				})
 			}
 
 			_, err := v.store.Linker().InsertManyIfNotExists(c.RequestContext(), linkNodes)
@@ -359,7 +367,7 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 			}
 		}
 
-		ids, err := v.store.RequestQueue().InsertMany(c.RequestContext(), req)
+		ids, err := v.store.RequestQueue().InsertMany(c.RequestContext(), rq)
 		if err != nil {
 			v.log.Error(err)
 			c.InternalError().JSON(&APIError{

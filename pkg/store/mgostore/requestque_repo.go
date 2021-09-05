@@ -38,6 +38,8 @@ func (rq *requestQueue) List(ctx context.Context, filter *metav1.RequestQueueLis
 		switch filter := f.(type) {
 		case *metav1.StringFilter:
 			query[key] = filter.Is
+		case *metav1.UintFilter:
+			query[key] = filter.Is
 		}
 	}
 
@@ -84,4 +86,11 @@ func (rq *requestQueue) InsertMany(ctx context.Context, queues []*metav1.Request
 	}
 
 	return insertedIDs, nil
+}
+
+func (rq *requestQueue) UpdateByID(ctx context.Context, id string, patch *metav1.RequestQueuePatch) error {
+	objID, _ := primitive.ObjectIDFromHex(id)
+
+	_, err := rq.coll.UpdateByID(ctx, objID, bson.M{"$set": patch})
+	return err
 }

@@ -52,13 +52,17 @@ func (j *JobPatch) Validate() error {
 	return nil
 }
 
-func (req *RequestQueueCreate) Validate() error {
+func (req *RequestQueueCreateAPI) Validate() error {
 	if req.RunID == "" {
 		return errors.New("runner id is required")
 	}
 
 	if req.URL == "" {
 		return errors.New("request queue url is required")
+	}
+
+	if req.Depth == 0 {
+		return errors.New("request queue depth is required")
 	}
 
 	return nil

@@ -15,6 +15,8 @@ type RequestQueue interface {
 	List(ctx context.Context, filters *metav1.RequestQueueListFilter) ([]*metav1.RequestQueue, error)
 
 	InsertMany(context.Context, []*metav1.RequestQueueCreate) ([]string, error)
+
+	UpdateByID(context.Context, string, *metav1.RequestQueuePatch) error
 }
 
 type Linker interface {

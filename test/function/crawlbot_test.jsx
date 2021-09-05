@@ -57,8 +57,9 @@ function PageWithInternalAndExternalLink({internalLinkName}) {
 }
 
 // TODO: more robust expect, like {links: [], requestToPages: []}
-// TODO:: outside_network should be checked only on backend side
-//
+// TODO: outside_network should be checked only on backend side
+// TODO: tests with errors on pages (not found, internal error or something else)
+// TODO: tests sometimes failed if run multiple instead of single
 export function TestData({rootServer}) {
     return [
         {
@@ -89,7 +90,7 @@ export function TestData({rootServer}) {
         },
         {
             start_url: rootServer + "/some-url",
-            description: "one depth only",
+            description: "depth level 2 but deeper pages don't have links",
             max_depth: 2,
             pages: {
                 [rootServer + "/some-url"]: {
@@ -104,7 +105,7 @@ export function TestData({rootServer}) {
                     body: html(<PageWithNoLinks/>),
                 },
                 [externalServer1URL]: {
-                    body: html(<PageWithOneInternalLink internalLinkName={internalLink2Name}/>),
+                    body: html(<PageWithNoLinks/>),
                     // outside_network: true,
                 },
             },
@@ -115,7 +116,7 @@ export function TestData({rootServer}) {
         },
         {
             start_url: rootServer + "/some-url",
-            description: "one depth only",
+            description: "depth level 2 and page level 2 has link",
             max_depth: 2,
             pages: {
                 [rootServer + "/some-url"]: {
@@ -125,6 +126,9 @@ export function TestData({rootServer}) {
                 },
                 [rootServer + internalLink1Link]: {
                     body: html(<PageWithOneInternalLink internalLinkName={internalLink2Name}/>)
+                },
+                [externalServer1URL]: {
+                    body: html(<PageWithNoLinks/>),
                 }
             },
             expect: [
