@@ -45,8 +45,10 @@ func (r *runnerRepo) List(ctx context.Context) ([]*metav1.Runner, error) {
 }
 
 func (r *runnerRepo) GetByID(ctx context.Context, id string) (*metav1.Runner, error) {
+	objID, _ := primitive.ObjectIDFromHex(id)
+
 	result := r.coll.FindOne(ctx, bson.M{
-		"_id": id,
+		"_id": objID,
 	})
 	if result.Err() != nil {
 		return nil, result.Err()

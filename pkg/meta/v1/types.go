@@ -57,6 +57,24 @@ type Runner struct {
 
 	// Depth current depth, not greater than RunnerUpCreate.MaxDepth.
 	Depth uint `json:"depth" bson:"depth"`
+
+	RunnerConfig
+}
+
+type RunnerConfig struct {
+	// ScrapeLinksPattern is a regexp pattern in which links should be scraped, useful for narrow down results.
+	// If not defined, then match all.
+	ScrapeLinksPattern string `json:"scrape_links_pattern"`
+
+	// FollowLinks which links should be crawled deeper.
+	// If not defined, then follow all links.
+	// Applied only if MaxDepth is greater than RunnerInitialDepth.
+	FollowLinks []*StringFilter `json:"follow_links"`
+
+	// MaxDepth how deep FollowLinks should be, counted from first run.
+	// Should be greater than or equal RunnerInitialDepth.
+	// By default, if not specified then runner crawl just once, even if FollowLinks is defined.
+	MaxDepth uint `json:"max_depth"`
 }
 
 type RunnerCreate struct {
@@ -67,6 +85,8 @@ type RunnerCreate struct {
 	Status RunnerStatus `json:"status" bson:"status"`
 
 	Depth uint `json:"depth" bson:"depth"`
+
+	RunnerConfig
 }
 
 type RunnerPatch struct {
@@ -84,18 +104,13 @@ type RunnerUpCreate struct {
 	// URL is a page url where runner should crawl.
 	URL string `json:"url"`
 
-	// ScrapeLinksPattern is a regexp pattern in which links should be scraped, useful for narrow down results.
-	// If not defined, then match all.
+	// RunnerConfig.ScrapeLinksPattern
 	ScrapeLinksPattern string `json:"scrape_links_pattern"`
 
-	// FollowLinks which links should be crawled deeper.
-	// If not defined, then follow all links.
-	// Applied only if MaxDepth is
+	// RunnerConfig.FollowLinks
 	FollowLinks []*StringFilter `json:"follow_links"`
 
-	// MaxDepth how deep FollowLinks should be, counted from first run.
-	// Should be greater than or equal RunnerInitialDepth.
-	// By default, if not specified then runner crawl just once, even if FollowLinks is defined.
+	// RunnerConfig.MaxDepth
 	MaxDepth uint `json:"max_depth"`
 }
 

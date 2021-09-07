@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -312,9 +313,12 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 	// TODO urls are now queues
 	// TODO: auth
 	// TODO: batch errors
+	// TODO: ScrapeLinksPattern, FollowLinks on frontend side
 	v1.Post("/v1/request-queue/batch", func(c api.Context) {
 		var req []*metav1.RequestQueueCreateAPI
 		rq := make([]*metav1.RequestQueueCreate, 0)
+
+		rs := v.store.Runner()
 
 		// TODO: body limitations?
 		data, err := ioutil.ReadAll(c.Request().Body)
@@ -333,9 +337,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 		}
 
 		{
-			linkNodes := make([]*metav1.LinkNodeCreate, len(req))
+			linkNodes := make([]*metav1.LinkNodeCreate, 0)
 
-			for i, r := range req {
+			for _, r := range req {
 				if err := r.Validate(); err != nil {
 					v.log.Error(err)
 					c.BadRequest().JSON(&APIError{
@@ -345,16 +349,64 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 					return
 				}
 
-				linkNodes[i] = &metav1.LinkNodeCreate{
-					URL: metav1.NewLinkURL(r.URL),
+				runner, err := rs.GetByID(c.RequestContext(), r.RunID)
+				if err != nil {
+					c.InternalError().JSON(&APIError{
+						Type: ErrorTypeInternal,
+					})
+					return
 				}
 
-				rq = append(rq, &metav1.RequestQueueCreate{
-					RunID:  r.RunID,
-					URL:    r.URL,
-					Depth:  r.Depth,
-					Status: metav1.RequestQueueStatusQueued,
-				})
+				addLinkNode := func() {
+					linkNodes = append(linkNodes, &metav1.LinkNodeCreate{
+						URL: metav1.NewLinkURL(r.URL),
+					})
+				}
+
+				if runner.RunnerConfig.ScrapeLinksPattern != "" {
+					if re, err := regexp.Compile(runner.RunnerConfig.ScrapeLinksPattern); err != nil {
+						v.log.Error(err)
+					} else {
+						if re.Match([]byte(r.URL)) {
+							addLinkNode()
+						}
+					}
+				} else {
+					addLinkNode()
+				}
+
+				addRequestQue := func() {
+					rq = append(rq, &metav1.RequestQueueCreate{
+						RunID:  r.RunID,
+						URL:    r.URL,
+						Depth:  r.Depth,
+						Status: metav1.RequestQueueStatusQueued,
+					})
+				}
+
+				if runner.RunnerConfig.FollowLinks == nil {
+					addRequestQue()
+				} else {
+					shouldAddRq := false
+					for _, filter := range runner.RunnerConfig.FollowLinks {
+						if filter.Match != nil {
+							if filter.Match.Match([]byte(r.URL)) {
+								shouldAddRq = true
+								break
+							}
+						} else if filter.Is != "" {
+							if r.URL == filter.Is {
+								shouldAddRq = true
+								break
+							}
+						}
+					}
+
+					if shouldAddRq {
+						addRequestQue()
+					}
+				}
+
 			}
 
 			_, err := v.store.Linker().InsertManyIfNotExists(c.RequestContext(), linkNodes)

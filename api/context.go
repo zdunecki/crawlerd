@@ -66,6 +66,10 @@ func (c ctx) RequestEntityTooLarge() Context {
 	return c
 }
 
+// TODO:
+//&APIError{
+//Type: ErrorTypeInternal,
+//}
 func (c ctx) InternalError() Context {
 	c.writer.WriteHeader(http.StatusInternalServerError)
 	return c

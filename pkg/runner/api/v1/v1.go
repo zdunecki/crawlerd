@@ -92,6 +92,7 @@ func (v1 *v1) ListenAndServe() {
 }
 
 // TODO: ScrapeLinksPattern, FollowLinks
+// TODO: ScrapeLinksPattern, FollowLinks on frontend side
 func (v1 *v1) run(c api.Context) {
 	req := &metav1.RunnerUpCreate{}
 	if err := c.Bind(req); err != nil {
@@ -113,6 +114,11 @@ func (v1 *v1) run(c api.Context) {
 		RunAt:  util.NowInt(),
 		Status: metav1.RunnerStatusQueued,
 		Depth:  currentRunnerDepth,
+		RunnerConfig: metav1.RunnerConfig{
+			ScrapeLinksPattern: req.ScrapeLinksPattern,
+			FollowLinks:        req.FollowLinks,
+			MaxDepth:           req.MaxDepth,
+		},
 	})
 
 	if err != nil {
@@ -132,21 +138,28 @@ func (v1 *v1) run(c api.Context) {
 	//}...)
 	//ctx, cancel = chromedp.NewContext(ctx)
 
-	// TODO: speedup (it should not run in pool or something else)
-	crawl := func(pageURL string, depth uint) (interface{}, error) {
-		var res interface{}
+	var chromeCtx context.Context
+	var crawlFunction string
 
+	{
 		ctx, cancel := chromedp.NewContext(c.RequestContext())
 		defer cancel()
 
-		crawlFunction, err := rfs.GetByID(c.RequestContext(), req.ID)
+		crawlFunction, err = rfs.GetByID(c.RequestContext(), req.ID)
 		if err != nil {
-			return nil, err
+			v1.log.Error(err)
+
+			c.InternalError().JSON(apiv1.APIError{
+				Type: apiv1.ErrorTypeInternal,
+			})
+			return
 		}
+
+		chromeCtx = ctx
 
 		// TODO: remove after debugging but console api will be useful in future releases
 		gotException := make(chan bool, 1)
-		chromedp.ListenTarget(ctx, func(ev interface{}) {
+		chromedp.ListenTarget(chromeCtx, func(ev interface{}) {
 			switch ev := ev.(type) {
 			case *runtime.EventConsoleAPICalled:
 				fmt.Printf("* console.%s call:\n", ev.Type)
@@ -160,6 +173,11 @@ func (v1 *v1) run(c api.Context) {
 				gotException <- true
 			}
 		})
+	}
+
+	// TODO: speedup (it should not run in pool or something else)
+	crawl := func(pageURL string, depth uint) (interface{}, error) {
+		var res interface{}
 
 		windowVariables := map[string]string{
 			"CRAWLERD_API_URL": v1.cfg.APIURL,
@@ -177,7 +195,7 @@ func (v1 *v1) run(c api.Context) {
 		}
 		onLoadScript = strings.Join(onLoadScriptAtoms, "\n")
 
-		if err := chromedp.Run(ctx,
+		if err := chromedp.Run(chromeCtx,
 			chromedp.Navigate(pageURL),
 			chromedp.Evaluate(onLoadScript, nil),
 			chromedp.Evaluate(crawlFunction, &res, func(params *runtime.EvaluateParams) *runtime.EvaluateParams {
