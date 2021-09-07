@@ -389,8 +389,9 @@ func (v *v1) Serve(addr string, v1 api.API) error {
 				} else {
 					shouldAddRq := false
 					for _, filter := range runner.RunnerConfig.FollowLinks {
-						if filter.Match != nil {
-							if filter.Match.Match([]byte(r.URL)) {
+						if filter.Match != "" {
+							re, _ := regexp.Compile(filter.Match)
+							if re.MatchString(r.URL) {
 								shouldAddRq = true
 								break
 							}

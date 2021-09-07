@@ -93,6 +93,7 @@ func (v1 *v1) ListenAndServe() {
 
 // TODO: ScrapeLinksPattern, FollowLinks
 // TODO: ScrapeLinksPattern, FollowLinks on frontend side
+// TODO: add runner start url to linker
 func (v1 *v1) run(c api.Context) {
 	req := &metav1.RunnerUpCreate{}
 	if err := c.Bind(req); err != nil {
