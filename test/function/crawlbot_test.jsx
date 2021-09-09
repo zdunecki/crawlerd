@@ -10,6 +10,19 @@ const internalLink2Link = "/" + internalLink2Name
 // const externalServer1URL = "http://url-to-another-server:8282"
 const externalServer1URL = "http://localhost:8282"
 
+function PageWithOneExternalLink() {
+    return <html>
+    <head>
+
+    </head>
+    <body>
+    <h1>This is a heading</h1>
+    <p>This is a paragraph.</p>
+    <a href={externalServer1URL}>Url to another mock server</a>
+    </body>
+    </html>
+}
+
 function PageWithOneInternalLink({internalLinkName}) {
     return <html>
     <head>
@@ -118,6 +131,77 @@ export function TestData({rootServer}) {
             start_url: rootServer + "/some-url",
             description: "depth level 2 and page level 2 has link",
             max_depth: 2,
+            pages: {
+                [rootServer + "/some-url"]: {
+                    body: html(<PageWithInternalAndExternalLink
+                        internalLinkName={internalLink1Name}
+                    />)
+                },
+                [rootServer + internalLink1Link]: {
+                    body: html(<PageWithOneInternalLink internalLinkName={internalLink2Name}/>)
+                },
+                [externalServer1URL]: {
+                    body: html(<PageWithNoLinks/>),
+                }
+            },
+            expect: [
+                rootServer + internalLink1Link,
+                externalServer1URL,
+                rootServer + internalLink2Link
+            ]
+        },
+        {
+            start_url: rootServer + "/some-url",
+            description: "depth level 2 and follow only root server links",
+            max_depth: 2,
+            pages: {
+                [rootServer + "/some-url"]: {
+                    body: html(<PageWithOneExternalLink/>)
+                },
+                [externalServer1URL]: {
+                    body: html(<PageWithOneInternalLink internalLinkName={internalLink1Name}/>),
+                }
+            },
+            follow_links: [
+                {
+                    match: rootServer
+                }
+            ],
+            expect: [
+                externalServer1URL,
+            ]
+        },
+        {
+            start_url: rootServer + "/some-url",
+            description: "depth level 2 and follow only root server links and scrape only root server links",
+            max_depth: 2,
+            pages: {
+                [rootServer + "/some-url"]: {
+                    body: html(<PageWithOneExternalLink/>)
+                },
+                [externalServer1URL]: {
+                    body: html(<PageWithOneInternalLink internalLinkName={internalLink1Name}/>),
+                }
+            },
+            follow_links: [
+                {
+                    match: rootServer
+                }
+            ],
+            scrape_links_pattern: rootServer,
+            expect: [
+
+            ]
+        },
+        {
+            start_url: rootServer + "/some-url",
+            description: "depth level 2 and page level 2 has link with root server follow_links",
+            max_depth: 2,
+            follow_links: [
+                {
+                    match: new RegExp(rootServer).toString()
+                }
+            ],
             pages: {
                 [rootServer + "/some-url"]: {
                     body: html(<PageWithInternalAndExternalLink

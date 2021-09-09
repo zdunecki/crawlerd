@@ -40,8 +40,8 @@ func TestCrawlBot(t *testing.T) {
 	api, store, storeOptions, done, err := testMongoDBAPI()
 	defer done()
 
-	rf := testkit.NewTestRunnerFunctions(getFunction)
-	storeOptions.CustomRunnerFunctions(rf).Apply()
+	rfs := testkit.NewTestRunnerFunctions(getFunction)
+	storeOptions.CustomRunnerFunctions(rfs).Apply()
 
 	runner, err := testRunner(store)
 	if err != nil {
@@ -157,10 +157,29 @@ func TestCrawlBot(t *testing.T) {
 		}
 
 		{
+			var followLinks []*metav1.StringFilter
+
+			if testCase.FollowLinks != nil {
+				followLinks = make([]*metav1.StringFilter, 0)
+				for _, f := range testCase.FollowLinks {
+					//re, err := regexp.Compile(f.Match)
+					//if err != nil {
+					//	t.Error(err)
+					//	return
+					//}
+
+					followLinks = append(followLinks, &metav1.StringFilter{
+						Is:    f.Is,
+						Match: f.Match,
+					})
+				}
+			}
 			_, err := runner.Run(&metav1.RunnerUpCreate{
-				ID:       runID,
-				URL:      testCase.StartURL,
-				MaxDepth: testCase.MaxDepth,
+				ID:                 runID,
+				URL:                testCase.StartURL,
+				MaxDepth:           testCase.MaxDepth,
+				ScrapeLinksPattern: testCase.ScrapeLinksPattern,
+				FollowLinks:        followLinks,
 			})
 
 			if err != nil {
@@ -185,7 +204,7 @@ func TestCrawlBot(t *testing.T) {
 
 		test.Diff(t, "linkerNodes len should be equal", len(expectLinks), len(linkerNodes))
 
-		if linkerNodes == nil || len(linkerNodes) != len(expectLinks) {
+		if linkerNodes != nil && (len(linkerNodes) != len(expectLinks)) {
 			t.Errorf("invalid linker linkerNodes len, expect=%d, but currently is=%d", len(expectLinks), len(linkerNodes))
 			return
 		}
