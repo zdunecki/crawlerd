@@ -223,11 +223,16 @@ func NewLinkURL(s string) LinkURL {
 	return LinkURL(LinkURL(s).trim())
 }
 
+func (u LinkURL) ToString() string {
+	return string(u)
+}
+
 func (u LinkURL) trim() string {
 	return strings.TrimSuffix(fmt.Sprintf("%s", u), "/")
 }
 
 type LinkNode struct {
+	ID  string  `json:"id" bson:"_id"`
 	URL LinkURL `json:"url" bson:"url"`
 }
 
@@ -252,9 +257,9 @@ type History struct {
 
 // Deprecated:
 type CrawlURL struct {
-	Id       int64  `json:"id"`
-	Url      string `json:"url"`
-	Interval int64  `json:"interval"`
+	Id  int64  `json:"id"`
+	Url string `json:"url"`
 	// Deprecated: Interval is not important now
+	Interval int64  `json:"interval"`
 	WorkerID string `json:"worker_id"`
 }

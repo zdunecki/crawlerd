@@ -13,24 +13,29 @@ import (
 // TODO: don't mix request queue for seed and search engine
 type RequestQueue interface {
 	List(ctx context.Context, filters *metav1.RequestQueueListFilter) ([]*metav1.RequestQueue, error)
+	FindOneByID(ctx context.Context, id string) (*metav1.RequestQueue, error)
 
 	InsertMany(context.Context, []*metav1.RequestQueueCreate) ([]string, error)
 
 	UpdateByID(context.Context, string, *metav1.RequestQueuePatch) error
+
+	DeleteOneByID(ctx context.Context, id string) (bool, error)
 }
 
 type Linker interface {
+	Scroll(context.Context, func([]*metav1.LinkNode)) error
+	FindOneByID(ctx context.Context, id string) (*metav1.LinkNode, error)
+	FindAll(context.Context) ([]*metav1.LinkNode, error)
+
 	InsertManyIfNotExists(context.Context, []*metav1.LinkNodeCreate) ([]string, error)
 
-	FindAll(context.Context) ([]*metav1.LinkNode, error)
+	Live() Linker
 }
 
 // TODO: better name
 // Deprecated: URL is now Linker
 type URL interface {
 	Scroll(context.Context, func([]metav1.URL)) error
-
-	FindOne(context.Context) (metav1.URL, error)
 	FindAll(context.Context) ([]metav1.URL, error)
 
 	InsertOne(ctx context.Context, url string, interval int) (bool, int, error)
@@ -44,7 +49,7 @@ type URL interface {
 type History interface {
 	FindByID(ctx context.Context, id int) ([]metav1.History, error)
 
-	InsertOne(ctx context.Context, id int, response []byte, duration time.Duration, createdAt time.Time) (bool, int, error)
+	InsertOne(ctx context.Context, id string, response []byte, duration time.Duration, createdAt time.Time) (bool, error)
 }
 
 // Deprecated: Registry is now RequestQueue

@@ -12,20 +12,20 @@ import (
 )
 
 type Controller interface {
-	ReAttachResources(chan metav1.CrawlURL)
+	ReAttachResources(chan *metav1.RequestQueue)
 }
 
 type controller struct {
-	scheduler crawlerdpb.SchedulerClient
-	registry  store.Registry
+	scheduler    crawlerdpb.SchedulerClient
+	requestQueue store.RequestQueue
 
 	log *log.Entry
 }
 
-func NewController(scheduler crawlerdpb.SchedulerClient, registry store.Registry) Controller {
+func NewController(scheduler crawlerdpb.SchedulerClient, requestQueue store.RequestQueue) Controller {
 	return &controller{
-		scheduler: scheduler,
-		registry:  registry,
+		scheduler:    scheduler,
+		requestQueue: requestQueue,
 
 		log: log.WithFields(map[string]interface{}{
 			"service": "controller",
@@ -34,7 +34,7 @@ func NewController(scheduler crawlerdpb.SchedulerClient, registry store.Registry
 }
 
 // TODO: what should do on k8s?
-func (c *controller) ReAttachResources(urlC chan metav1.CrawlURL) {
+func (c *controller) ReAttachResources(urlC chan *metav1.RequestQueue) {
 	c.log.Debugln("attach jobs to another workers...")
 
 	wg := sync.WaitGroup{}
@@ -47,31 +47,32 @@ func (c *controller) ReAttachResources(urlC chan metav1.CrawlURL) {
 	wg.Add(urlCLen)
 
 	i := 0
-	for crawl := range urlC {
-		func(crawl metav1.CrawlURL) {
+	for rq := range urlC {
+		func() {
 			defer func() {
 				wg.Done()
 				i++
 			}()
-			c.log.Debugf("attaching id=%d", crawl.Id)
+			c.log.Debugf("attaching id=%s", rq.ID)
 
-			if err := c.registry.DeleteURL(context.Background(), crawl); err != nil {
+			if _, err := c.requestQueue.DeleteOneByID(context.Background(), rq.ID); err != nil {
 				c.log.Error(err)
 				return
 			}
 
 			// TODO: retry
 			if _, err := c.scheduler.AddURL(context.Background(), &crawlerdpb.RequestURL{
-				Id:       crawl.Id,
-				Url:      crawl.Url,
-				Interval: crawl.Interval,
-				Lease:    true,
+				Id: 0,
+				//Id:       crawl.ID,
+				Url: rq.URL,
+				//Interval: crawl.Interval,
+				Lease: true,
 			}); err != nil && err != scheduler.ErrNoWorkers {
 				c.log.Error(err)
 			}
 
 			return
-		}(crawl)
+		}()
 
 		if i >= urlCLen {
 			break

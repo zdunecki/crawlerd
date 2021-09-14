@@ -109,14 +109,14 @@ func New(cfg *Config, opts ...Option) (Worker, error) {
 		worker.id = id
 		worker.addr = addr
 
-		worker.crawler = NewCrawler(worker.storage, worker, worker.pubsub, worker.compressor, worker.httpClient)
+		worker.crawler = NewCrawler(worker.storage.History(), worker.storage.RequestQueue(), worker, worker.pubsub, worker.compressor, worker.httpClient)
 
 		grpcsrv, schedulercli, lis, err := worker.newGRPC()
 		if err != nil {
 			return nil, err
 		}
 
-		worker.ctrl = NewController(schedulercli, worker.storage.Registry())
+		worker.ctrl = NewController(schedulercli, worker.storage.RequestQueue())
 
 		worker.grpcserver = grpcsrv
 		worker.listener = lis

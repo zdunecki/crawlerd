@@ -64,6 +64,24 @@ func (rq *requestQueue) List(ctx context.Context, filter *metav1.RequestQueueLis
 	return nodes, err
 }
 
+func (rq *requestQueue) FindOneByID(ctx context.Context, id string) (*metav1.RequestQueue, error) {
+	resp := rq.coll.FindOne(ctx, bson.M{
+		"id": id,
+	})
+
+	if resp.Err() != nil {
+		return nil, resp.Err()
+	}
+
+	var data *metav1.RequestQueue
+
+	if err := resp.Decode(&data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
 func (rq *requestQueue) InsertMany(ctx context.Context, queues []*metav1.RequestQueueCreate) ([]string, error) {
 	insertedIDs := make([]string, 0)
 
@@ -86,6 +104,21 @@ func (rq *requestQueue) InsertMany(ctx context.Context, queues []*metav1.Request
 	}
 
 	return insertedIDs, nil
+}
+
+func (rq *requestQueue) DeleteOneByID(ctx context.Context, id string) (bool, error) {
+	result, err := rq.coll.DeleteOne(
+		ctx,
+		bson.M{
+			"id": id,
+		},
+	)
+
+	if err != nil {
+		return false, err
+	}
+
+	return result.DeletedCount != 0, nil
 }
 
 func (rq *requestQueue) UpdateByID(ctx context.Context, id string, patch *metav1.RequestQueuePatch) error {

@@ -20,7 +20,7 @@ func NewHistoryRepository(coll *mongo.Collection) store.History {
 	}
 }
 
-func (h *historyrepo) InsertOne(ctx context.Context, id int, response []byte, duration time.Duration, createdAt time.Time) (bool, int, error) {
+func (h *historyrepo) InsertOne(ctx context.Context, id string, response []byte, duration time.Duration, createdAt time.Time) (bool, error) {
 	result, err := h.coll.InsertOne(ctx, bson.M{
 		"id":         id,
 		"response":   string(response),
@@ -29,14 +29,14 @@ func (h *historyrepo) InsertOne(ctx context.Context, id int, response []byte, du
 	})
 
 	if err != nil {
-		return false, 0, err
+		return false, err
 	}
 
 	if result.InsertedID == nil {
-		return false, 0, nil
+		return false, nil
 	}
 
-	return true, id, nil
+	return true, nil
 }
 
 func (h *historyrepo) FindByID(ctx context.Context, id int) ([]v1.History, error) {

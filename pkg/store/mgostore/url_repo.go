@@ -28,10 +28,6 @@ func NewURLRepository(coll *mongo.Collection, client Storage) store.URL {
 	}
 }
 
-func (u *urlrepo) FindOne(ctx context.Context) (v1.URL, error) {
-	panic("implement me")
-}
-
 func (u *urlrepo) FindAll(ctx context.Context) ([]v1.URL, error) {
 	cursor, err := u.coll.Find(ctx, bson.M{})
 	if err != nil {

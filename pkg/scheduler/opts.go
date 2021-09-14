@@ -131,7 +131,7 @@ func WithWatcher(opts ...*WatcherOption) Option {
 			return kitscheduler.ErrClusterIsRequired
 		}
 
-		s.watcher = NewWatcher(workerCluster, storage.URL(), storage.Registry(), timerTimeOut)
+		s.watcher = NewWatcher(workerCluster, storage.Linker(), timerTimeOut)
 
 		return nil
 	}

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/v1"
 	"crawlerd/pkg/store"
 	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"
@@ -30,8 +30,7 @@ type Watcher interface {
 
 type watcher struct {
 	workerCluster worker.Cluster
-	url           store.URL
-	registry      store.Registry
+	linker        store.Linker
 	mu            *sync.RWMutex
 	jobDoneC      chan bool
 	isJobRunning  bool
@@ -43,11 +42,10 @@ type watcher struct {
 	log *log.Entry
 }
 
-func NewWatcher(workerCluster worker.Cluster, url store.URL, registry store.Registry, timerTimeout time.Duration) Watcher {
+func NewWatcher(workerCluster worker.Cluster, linker store.Linker, timerTimeout time.Duration) Watcher {
 	return &watcher{
 		workerCluster:   workerCluster,
-		url:             url,
-		registry:        registry,
+		linker:          linker,
 		urlTimerTimeout: timerTimeout,
 		urlTimer:        time.NewTimer(timerTimeout),
 		mu:              &sync.RWMutex{},
@@ -112,12 +110,12 @@ func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 
 		// TODO: consider better solution than scrolling whole urls
 		// TODO: scroll not acked request queues
-		if err := w.url.Scroll(context.Background(), func(urls []v1.URL) {
-			w.log.Debugf("found url's candidates to start crawl, len=%d", len(urls))
+		if err := w.linker.Scroll(context.Background(), func(nodes []*metav1.LinkNode) {
+			w.log.Debugf("found url's candidates to start crawl, len=%d", len(nodes))
 
-			for _, url := range urls {
-				go func(url v1.URL) {
-					resp, err := w.registry.GetURLByID(context.Background(), url.ID)
+			for _, node := range nodes {
+				go func(node *metav1.LinkNode) {
+					resp, err := w.linker.Live().FindOneByID(context.Background(), node.ID)
 
 					if err != nil {
 						log.Error(err)
@@ -131,11 +129,11 @@ func (w watcher) WatchNewURLs(f func(*crawlerdpb.RequestURL)) {
 					}
 
 					f(&crawlerdpb.RequestURL{
-						Id:       int64(url.ID),
-						Url:      url.URL,
-						Interval: int64(url.Interval),
+						//Id:  int64(node.ID),
+						Url: node.URL.ToString(),
+						//Interval: int64(url.Interval),
 					})
-				}(url)
+				}(node)
 			}
 		}); err != nil {
 			log.Error(err)
