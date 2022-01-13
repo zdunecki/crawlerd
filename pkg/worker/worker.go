@@ -22,6 +22,7 @@ type Worker interface {
 	ID() string
 	Addr() string
 	Serve(context.Context) error
+	Cluster() Cluster
 
 	gracefulShutdown(context.Context)
 	newGRPC() (*grpc.Server, crawlerdpb.SchedulerClient, net.Listener, error)
@@ -97,7 +98,7 @@ func New(cfg *Config, opts ...Option) (Worker, error) {
 	//}
 
 	if worker.cluster == nil {
-		return nil, ErrWorkerIsRequired
+		return nil, ErrWorkerClusterIsRequired
 	}
 
 	{
@@ -171,6 +172,10 @@ func (w *worker) Serve(ctx context.Context) error {
 	w.log.Debug("successfully gracefully shut down")
 
 	return err
+}
+
+func (w *worker) Cluster() Cluster {
+	return w.cluster
 }
 
 func (w *worker) gracefulShutdown(ctx context.Context) {

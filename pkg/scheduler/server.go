@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"crawlerd/crawlerdpb"
-	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
+	scheduler "crawlerd/pkg/core/scheduler"
 )
 
 type Server interface {
@@ -90,12 +90,12 @@ func (s *server) setLasing(l Leasing) {
 
 func (s *server) getWorker() (crawlerdpb.WorkerClient, error) {
 	if s.workerGen == nil {
-		return nil, kitscheduler.ErrNoWorkerGen
+		return nil, scheduler.ErrNoWorkerGen
 	}
 
 	workerClient, ok := s.workerGen.Next().(crawlerdpb.WorkerClient)
 	if !ok {
-		return nil, kitscheduler.ErrWorkerType
+		return nil, scheduler.ErrWorkerType
 	}
 
 	return workerClient, nil

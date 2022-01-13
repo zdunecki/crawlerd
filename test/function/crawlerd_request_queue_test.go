@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	metav1 "crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/metav1"
 )
 
 func TestRequestQueueCreateAPIEndpoint(t *testing.T) {

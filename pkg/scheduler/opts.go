@@ -3,7 +3,7 @@ package scheduler
 import (
 	"time"
 
-	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
+	"crawlerd/pkg/core/scheduler"
 	"crawlerd/pkg/store"
 	"crawlerd/pkg/store/options"
 	"crawlerd/pkg/worker"
@@ -18,7 +18,7 @@ type k8sConfig struct {
 }
 
 type (
-	Option func(*scheduler) error
+	Option func(*schedulerT) error
 
 	WatcherOption struct {
 		etcdConfig   *clientv3.Config
@@ -70,7 +70,7 @@ func (o *WatcherOption) WithStorage(s store.Repository) *WatcherOption {
 }
 
 func WithWatcher(opts ...*WatcherOption) Option {
-	return func(s *scheduler) error {
+	return func(s *schedulerT) error {
 		timerTimeOut := DefaultTimerTimeout
 		storage := s.storage
 		var workerCluster worker.Cluster
@@ -109,15 +109,15 @@ func WithWatcher(opts ...*WatcherOption) Option {
 		}
 
 		if storage == nil {
-			return kitscheduler.ErrStorageIsRequired
+			return scheduler.ErrStorageIsRequired
 		}
 
 		if storage.URL() == nil {
-			return kitscheduler.ErrURLRepositoryIsRequired
+			return scheduler.ErrURLRepositoryIsRequired
 		}
 
 		if storage.Registry() == nil {
-			return kitscheduler.ErrRegistryRepositoryIsRequired
+			return scheduler.ErrRegistryRepositoryIsRequired
 		}
 
 		if workerCluster == nil {
@@ -128,7 +128,7 @@ func WithWatcher(opts ...*WatcherOption) Option {
 		}
 
 		if workerCluster == nil {
-			return kitscheduler.ErrClusterIsRequired
+			return scheduler.ErrClusterIsRequired
 		}
 
 		s.watcher = NewWatcher(workerCluster, storage.Linker(), timerTimeOut)
@@ -138,7 +138,7 @@ func WithWatcher(opts ...*WatcherOption) Option {
 }
 
 func WithStorage(opts ...*options.RepositoryOption) Option {
-	return func(s *scheduler) error {
+	return func(s *schedulerT) error {
 		storage, err := options.WithStorage(opts...)
 
 		if err != nil {
@@ -152,7 +152,7 @@ func WithStorage(opts ...*options.RepositoryOption) Option {
 }
 
 func WithWorkerClusterConfig(cfg *worker.Config) Option {
-	return func(s *scheduler) error {
+	return func(s *schedulerT) error {
 		s.clusterConfig = cfg
 
 		return nil

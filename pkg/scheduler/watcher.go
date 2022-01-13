@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
-	metav1 "crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/metav1"
 	"crawlerd/pkg/store"
 	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"

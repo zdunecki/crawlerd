@@ -1,4 +1,4 @@
-package v1
+package runnerv1
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"crawlerd/api"
 	apiv1 "crawlerd/api/v1"
-	metav1 "crawlerd/pkg/meta/v1"
+	"crawlerd/pkg/meta/metav1"
 	"crawlerd/pkg/store"
 	"crawlerd/pkg/util"
 	"github.com/chromedp/cdproto/runtime"
@@ -99,7 +99,7 @@ func (v1 *v1) run(c api.Context) {
 	if err := c.Bind(req); err != nil {
 		v1.log.Error(err)
 
-		c.InternalError().JSON(apiv1.APIError{
+		c.InternalError().JSON(apiobjects.APIError{
 			Type: apiv1.ErrorTypeInternal,
 		})
 		return
@@ -125,7 +125,7 @@ func (v1 *v1) run(c api.Context) {
 	if err != nil {
 		v1.log.Error(err)
 
-		c.InternalError().JSON(apiv1.APIError{
+		c.InternalError().JSON(apiobjects.APIError{
 			Type: apiv1.ErrorTypeInternal,
 		})
 		return
@@ -150,7 +150,7 @@ func (v1 *v1) run(c api.Context) {
 		if err != nil {
 			v1.log.Error(err)
 
-			c.InternalError().JSON(apiv1.APIError{
+			c.InternalError().JSON(apiobjects.APIError{
 				Type: apiv1.ErrorTypeInternal,
 			})
 			return
@@ -212,7 +212,7 @@ func (v1 *v1) run(c api.Context) {
 	if _, err := crawl(req.URL, currentRunnerDepth); err != nil {
 		v1.log.Error(err)
 
-		c.InternalError().JSON(apiv1.APIError{
+		c.InternalError().JSON(apiobjects.APIError{
 			Type: apiv1.ErrorTypeInternal,
 		})
 
@@ -234,7 +234,7 @@ func (v1 *v1) run(c api.Context) {
 		if err := runSuccessed(); err != nil {
 			v1.log.Error(err)
 
-			c.InternalError().JSON(apiv1.APIError{
+			c.InternalError().JSON(apiobjects.APIError{
 				Type: apiv1.ErrorTypeInternal,
 			})
 			return
@@ -247,7 +247,7 @@ func (v1 *v1) run(c api.Context) {
 				if err := runSuccessed(); err != nil {
 					v1.log.Error(err)
 
-					c.InternalError().JSON(apiv1.APIError{
+					c.InternalError().JSON(apiobjects.APIError{
 						Type: apiv1.ErrorTypeInternal,
 					})
 					return
@@ -270,7 +270,7 @@ func (v1 *v1) run(c api.Context) {
 			if err != nil {
 				v1.log.Error(err)
 
-				c.InternalError().JSON(apiv1.APIError{
+				c.InternalError().JSON(apiobjects.APIError{
 					Type: apiv1.ErrorTypeInternal,
 				})
 				return

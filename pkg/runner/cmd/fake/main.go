@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	v1 "crawlerd/pkg/runner/api/v1"
+	v1 "crawlerd/pkg/runner/api/runnerv1"
 )
 
 func main() {

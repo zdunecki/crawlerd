@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
-	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
+	"crawlerd/pkg/core/scheduler"
 	"crawlerd/pkg/store"
 	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
@@ -27,9 +27,9 @@ type Scheduler interface {
 	watchNewURLs()
 }
 
-type scheduler struct {
-	storage store.Repository
-	watcher Watcher
+type schedulerT struct {
+	storage       store.Repository
+	watcher       Watcher
 	leasing       Leasing
 	server        Server
 	clusterConfig *worker.Config
@@ -44,7 +44,7 @@ func New(opts ...Option) (Scheduler, error) {
 
 	srv := NewServer()
 
-	s := &scheduler{
+	s := &schedulerT{
 		server: srv,
 		log: log.WithFields(map[string]interface{}{
 			"service": "scheduler",
@@ -58,15 +58,15 @@ func New(opts ...Option) (Scheduler, error) {
 	}
 
 	if s.storage == nil {
-		return nil, kitscheduler.ErrStorageIsRequired
+		return nil, scheduler.ErrStorageIsRequired
 	}
 
 	if s.watcher == nil {
-		return nil, kitscheduler.ErrWatcherIsRequired
+		return nil, scheduler.ErrWatcherIsRequired
 	}
 
 	if s.leasing == nil {
-		return nil, kitscheduler.ErrLeasingIsRequired
+		return nil, scheduler.ErrLeasingIsRequired
 	}
 
 	srv.setLasing(s.leasing)
@@ -74,7 +74,7 @@ func New(opts ...Option) (Scheduler, error) {
 	return s, nil
 }
 
-func (s *scheduler) Serve(addr string) error {
+func (s *schedulerT) Serve(addr string) error {
 	maxWait := time.Minute
 
 	bo := backoff.NewExponentialBackOff()
@@ -85,7 +85,7 @@ func (s *scheduler) Serve(addr string) error {
 
 	return backoff.Retry(func() error {
 		s.log.Debug("lease")
-		if err := s.leasing.Lease(); err != nil && err != kitscheduler.ErrNoWorkers {
+		if err := s.leasing.Lease(); err != nil && err != scheduler.ErrNoWorkers {
 			s.log.Debug("lease err: " + err.Error())
 			return err
 		}
@@ -113,11 +113,11 @@ func (s *scheduler) Serve(addr string) error {
 	}, bo)
 }
 
-func (s *scheduler) watchWorkers() {
+func (s *schedulerT) watchWorkers() {
 	s.watcher.WatchWorkers(func(ev WorkerWatcherEvent) {
 		switch ev {
 		case WorkerWatcherEventDelete, WorkerWatcherEventPut, WorkerWatcherEventTicker:
-			if err := s.leasing.Lease(); err != nil && err != kitscheduler.ErrNoWorkers {
+			if err := s.leasing.Lease(); err != nil && err != scheduler.ErrNoWorkers {
 				s.log.Error(err)
 				return
 			}
@@ -129,7 +129,7 @@ func (s *scheduler) watchWorkers() {
 	})
 }
 
-func (s *scheduler) watchNewURLs() {
+func (s *schedulerT) watchNewURLs() {
 	s.watcher.WatchNewURLs(func(url *crawlerdpb.RequestURL) {
 		if _, err := s.server.AddURL(context.Background(), url); err != nil {
 			s.log.Error(err)

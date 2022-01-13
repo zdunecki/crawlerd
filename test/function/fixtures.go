@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"crawlerd/api"
-	v1 "crawlerd/api/v1"
-	"crawlerd/api/v1/client"
-	runnerv1 "crawlerd/pkg/runner/api/v1"
+	"crawlerd/api/v1"
+	"crawlerd/api/v1/sdk"
+	"crawlerd/pkg/runner/api/runnerv1"
 	"crawlerd/pkg/store"
 	storeOptions "crawlerd/pkg/store/options"
 	"github.com/go-chi/chi/v5"
@@ -84,7 +84,7 @@ func testMongoDBAPI() (v1.V1, store.Repository, *storeOptions.RepositoryOption, 
 
 	time.Sleep(time.Second * 1)
 
-	c, err := client.NewWithOpts(client.WithHTTPAddr("http://localhost" + appAddr))
+	c, err := sdk.NewWithOpts(sdk.WithHTTPAddr("http://localhost" + appAddr))
 
 	return c, apiV1.Store(), storeOptions, done, nil
 }

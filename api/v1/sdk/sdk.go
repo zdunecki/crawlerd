@@ -1,6 +1,8 @@
-package client
+package sdk
 
 // TODO: client vs sdk vs something else ?
+
+// TODO: auto generated client
 
 import (
 	"errors"

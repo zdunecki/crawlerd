@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/apikit/pkg/scheduler"
-	metav1 "crawlerd/pkg/meta/v1"
+	"crawlerd/pkg/core/scheduler"
+	metav1 "crawlerd/pkg/meta/metav1"
 	"crawlerd/pkg/store"
 	log "github.com/sirupsen/logrus"
 )

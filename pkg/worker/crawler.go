@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
-	metav1 "crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/metav1"
 	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/store"
 	"crawlerd/pkg/util"
@@ -193,7 +193,8 @@ func (c *crawler) newIntervalQue(crawlURL *metav1.RequestQueue) {
 	intervalID := QueueInterval(0)
 
 	//i := crawlURL.Interval
-	i := 0
+	//i := 0
+	i := 15
 	ticker := time.NewTicker(time.Second * time.Duration(i))
 	c.stopC[intervalID] = make(chan bool)
 	c.ticker[intervalID] = ticker

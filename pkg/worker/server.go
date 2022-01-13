@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"crawlerd/crawlerdpb"
-	metav1 "crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/metav1"
 )
 
 type server struct {

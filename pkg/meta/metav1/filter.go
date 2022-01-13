@@ -1,4 +1,4 @@
-package v1
+package metav1
 
 // TODO: proof of concept
 

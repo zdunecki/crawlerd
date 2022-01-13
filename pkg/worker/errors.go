@@ -12,5 +12,5 @@ var (
 
 	ErrEmptySchedulerGRPCSrvAddr = errors.New("empty scheduler grpc server address")
 
-	ErrWorkerIsRequired = errors.New("worker is required")
+	ErrWorkerClusterIsRequired = errors.New("worker cluster is required")
 )

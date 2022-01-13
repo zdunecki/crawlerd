@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+	// TODO: config
 	var (
 		dbName string
 
@@ -38,7 +39,6 @@ func main() {
 	flag.Parse()
 
 	var opts []v1.Option
-
 
 	// TODO: support different stores
 

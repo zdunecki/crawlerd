@@ -17,6 +17,7 @@ import (
 )
 
 func main() {
+	// TODO: config
 	var (
 		port string
 

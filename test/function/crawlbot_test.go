@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"testing"
 
-	metav1 "crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/metav1"
 	"crawlerd/pkg/runner/testkit"
 	"crawlerd/test"
 	"gopkg.in/h2non/gock.v1"

@@ -1,8 +1,8 @@
-package client
+package sdk
 
 import (
 	v1 "crawlerd/api/v1"
-	metav1 "crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/metav1"
 )
 
 type httpRequestQueue struct {

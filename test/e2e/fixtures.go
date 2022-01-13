@@ -8,9 +8,10 @@ import (
 
 	"crawlerd/api"
 	v1 "crawlerd/api/v1"
-	"crawlerd/api/v1/client"
+	"crawlerd/api/v1/sdk"
 	"crawlerd/pkg/pubsub"
 	"crawlerd/pkg/scheduler"
+	"crawlerd/pkg/store"
 	storageopt "crawlerd/pkg/store/options"
 	"crawlerd/pkg/worker"
 	"github.com/go-chi/chi/v5"
@@ -59,7 +60,7 @@ func NewETCDPreset() gnomock.Preset {
 	return &ETCDPreset{}
 }
 
-func testWorker(e2e *worker_e2e, mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string, opts *setupOptions) {
+func testWorker(e2e *worker_e2e, mongoDBName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker string, opts *setupOptions) worker.Worker {
 	kafka, err := pubsub.NewKafka(kafkaBroker)
 	if err != nil {
 		panic(err)
@@ -89,14 +90,19 @@ func testWorker(e2e *worker_e2e, mongoDBName, mongoURI, schedulerGRPCAddr, etcdA
 		worker.WithBrotliCompression(),
 	)
 
+	work.ID()
 	if err != nil {
 		panic(err)
 	}
 
-	if err := work.Serve(e2e.ctx); err != nil {
-		panic(err)
-	}
-	e2e.doneC <- true
+	go func() {
+		if err := work.Serve(e2e.ctx); err != nil {
+			panic(err)
+		}
+		e2e.doneC <- true
+	}()
+
+	return work
 }
 
 func testScheduler(grpcAddr, mongoDBName, mongoURI, etcdAddr string) {
@@ -126,7 +132,7 @@ func testScheduler(grpcAddr, mongoDBName, mongoURI, etcdAddr string) {
 	}
 }
 
-func testApi(appAddr, schedulerGRPCAddr, mongoDBName, mongoURI string) {
+func testApi(appAddr, schedulerGRPCAddr, mongoDBName, mongoURI string) store.Repository {
 	apiV1, err := v1.New(
 		v1.WithMongoDBStorage(mongoDBName, options.Client().ApplyURI(mongoURI)),
 		v1.WithGRPCSchedulerServer(schedulerGRPCAddr),
@@ -136,9 +142,13 @@ func testApi(appAddr, schedulerGRPCAddr, mongoDBName, mongoURI string) {
 		panic(err)
 	}
 
-	if err := apiV1.Serve(appAddr, api.New(chi.NewMux())); err != nil {
-		panic(err)
-	}
+	go func() {
+		if err := apiV1.Serve(appAddr, api.New(chi.NewMux())); err != nil {
+			panic(err)
+		}
+	}()
+
+	return apiV1.Store()
 }
 
 func randomPort() string {
@@ -159,8 +169,10 @@ func (w *worker_e2e) done() <-chan bool {
 }
 
 type setup struct {
-	etcdContainer *gnomock.Container
 	crawld        v1.V1
+	cluster       worker.Cluster
+	store         store.Repository
+	etcdContainer *gnomock.Container
 	done          func()
 	worker_e2e    []*worker_e2e
 }
@@ -202,15 +214,16 @@ func setupClient(opts *setupOptions) (*setup, error) {
 	mongoURI := fmt.Sprintf("mongodb://%s", mongoContainer.DefaultAddress())
 	etcdAddr := etcdContainer.DefaultAddress()
 
-	go func() {
-		testApi(apiHost, schedulerGRPCAddr, dbName, mongoURI)
-	}()
+	testAPIStore := testApi(apiHost, schedulerGRPCAddr, dbName, mongoURI)
 
 	go func() {
 		testScheduler(schedulerGRPCAddr, dbName, mongoURI, etcdAddr)
 	}()
 
 	workere2e := make([]*worker_e2e, 0)
+
+	var cluster worker.Cluster
+
 	go func() {
 		workerCtx, workerCtxCancel := context.WithCancel(context.Background())
 		e2e := &worker_e2e{
@@ -220,7 +233,8 @@ func setupClient(opts *setupOptions) (*setup, error) {
 		}
 		workere2e = append(workere2e, e2e)
 
-		testWorker(e2e, dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, opts)
+		w := testWorker(e2e, dbName, mongoURI, schedulerGRPCAddr, etcdAddr, kafkaBroker, opts)
+		cluster = w.Cluster()
 	}()
 
 	if opts.additionalWorkerCount > 0 {
@@ -243,11 +257,13 @@ func setupClient(opts *setupOptions) (*setup, error) {
 
 	time.Sleep(time.Second * 1)
 
-	c, err := client.NewWithOpts(client.WithHTTPAddr("http://localhost:6666"))
+	c, err := sdk.NewWithOpts(sdk.WithHTTPAddr("http://localhost:6666"))
 
 	return &setup{
-		etcdContainer: etcdContainer,
 		crawld:        c,
+		cluster:       cluster,
+		store:         testAPIStore,
+		etcdContainer: etcdContainer,
 		done:          done,
 		worker_e2e:    workere2e,
 	}, err

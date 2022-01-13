@@ -1,4 +1,4 @@
-package v1
+package runnerv1
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	metav1 "crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/metav1"
 	jsoniter "github.com/json-iterator/go"
 )
 

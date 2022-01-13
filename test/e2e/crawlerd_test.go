@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -53,6 +54,16 @@ func TestCrawlOneURL(t *testing.T) {
 		Endpoints:   []string{setup.etcdContainer.DefaultAddress()}, // get host from container
 		DialTimeout: time.Second * 15,
 	}
+
+	rqs := setup.store.RequestQueue()
+
+	requestQueues, err := rqs.List(context.Background(), nil)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	fmt.Println(requestQueues)
 
 	etcd, err := clientv3.New(etcdCfg)
 	if err != nil {

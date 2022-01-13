@@ -3,7 +3,7 @@ package mgostore
 import (
 	"context"
 
-	metav1 "crawlerd/pkg/meta/v1"
+	metav1 "crawlerd/pkg/meta/metav1"
 	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

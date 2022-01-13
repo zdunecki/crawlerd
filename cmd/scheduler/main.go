@@ -16,6 +16,7 @@ import (
 )
 
 func main() {
+	// TODO: config
 	var (
 		workerPort string
 
@@ -61,8 +62,6 @@ func main() {
 	var opts []scheduler.Option
 
 	var etcdEndpoints []string
-
-	fmt.Println("update 3")
 
 	if etcdAddr != "" {
 		etcdEndpoints = append(etcdEndpoints, etcdAddr)

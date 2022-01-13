@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"crawlerd/crawlerdpb"
-	kitscheduler "crawlerd/pkg/apikit/pkg/scheduler"
-	"crawlerd/pkg/roundrobin"
+	"crawlerd/pkg/core/scheduler"
+	"crawlerd/pkg/utils/roundrobin"
 	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
@@ -49,7 +49,7 @@ func (l *leasing) Lease() error {
 
 		if workers == nil || len(workers) == 0 {
 			l.srv.PutWorkerGen(nil)
-			return kitscheduler.ErrNoWorkers
+			return scheduler.ErrNoWorkers
 		}
 
 		workerClients := make([]interface{}, len(workers))

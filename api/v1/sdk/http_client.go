@@ -1,4 +1,4 @@
-package client
+package sdk
 
 import (
 	"bytes"
@@ -6,8 +6,21 @@ import (
 	"net/http"
 
 	v1 "crawlerd/api/v1"
+	"crawlerd/api/v1/objects"
 	jsoniter "github.com/json-iterator/go"
 )
+
+type rest interface {
+	get(resource string, outPtr interface{}) error
+
+	post(resource string, body interface{}, outPtr interface{}) error
+
+	patch(resource string, body interface{}, outPtr interface{}) error
+
+	put(resource string, body interface{}, outPtr interface{}) error
+
+	delete(resource string, body interface{}, outPtr interface{}) error
+}
 
 type httpClient struct {
 	apiURL string
@@ -24,9 +37,18 @@ func newHTTPClient(apiURL string, http *http.Client) v1.V1 {
 		http:   http,
 	}
 
-	c.url = &httpURL{client: c}
-	c.requestQueue = &httpRequestQueue{client: c}
-	c.linker = &httpLinker{client: c}
+	c.url = &httpURL{
+		rest: &httpClient{
+			apiURL: apiURL + "/urls",
+			http:   http,
+		},
+	}
+	c.requestQueue = &httpRequestQueue{
+		client: c,
+	}
+	c.linker = &httpLinker{
+		client: c,
+	}
 
 	return c
 }
@@ -104,7 +126,7 @@ func (c *httpClient) request(method, resource string, body interface{}, outPtr i
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < 600 {
-		apiErr := &v1.APIError{}
+		apiErr := &objects.APIError{}
 
 		if err := jsoniter.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
 			return err

@@ -3,7 +3,7 @@ package mgostore
 import (
 	"context"
 
-	"crawlerd/pkg/meta/v1"
+	"crawlerd/pkg/meta/metav1"
 	"crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,7 +28,7 @@ func NewURLRepository(coll *mongo.Collection, client Storage) store.URL {
 	}
 }
 
-func (u *urlrepo) FindAll(ctx context.Context) ([]v1.URL, error) {
+func (u *urlrepo) FindAll(ctx context.Context) ([]metav1.URL, error) {
 	cursor, err := u.coll.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
@@ -36,11 +36,11 @@ func (u *urlrepo) FindAll(ctx context.Context) ([]v1.URL, error) {
 
 	defer cursor.Close(ctx)
 
-	var urls []v1.URL
+	var urls []metav1.URL
 
 	for cursor.Next(ctx) {
 
-		var responseURL v1.URL
+		var responseURL metav1.URL
 
 		if err := cursor.Decode(&responseURL); err != nil {
 			return nil, err
@@ -114,7 +114,7 @@ func (u *urlrepo) DeleteOneByID(ctx context.Context, id int) (bool, error) {
 }
 
 // TODO: tests
-func (u *urlrepo) Scroll(ctx context.Context, f func([]v1.URL)) error {
+func (u *urlrepo) Scroll(ctx context.Context, f func([]metav1.URL)) error {
 	cursor, err := u.coll.Find(ctx, bson.M{})
 	if err != nil {
 		return err
@@ -122,10 +122,10 @@ func (u *urlrepo) Scroll(ctx context.Context, f func([]v1.URL)) error {
 
 	i := 1
 
-	var urls []v1.URL
+	var urls []metav1.URL
 
 	for cursor.Next(ctx) {
-		var url v1.URL
+		var url metav1.URL
 
 		if err := cursor.Decode(&url); err != nil {
 			return err
