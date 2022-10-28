@@ -68,6 +68,11 @@ func New(apiv1 api.API, store store.Repository, scheduler crawlerdpb.SchedulerCl
 	// request queue
 	apiv1.Post(requestQueuePath+"/batch", r.requestQueueBatchCreate)
 
+	// seed
+	apiv1.Get("/seed", r.seedList)
+	apiv1.Post("/seed", r.seedAppend)
+	apiv1.Delete("/seed/{id}", r.seedDelete)
+
 	// urls
 	apiv1.Get(urlsPath, r.urlsGetAll)
 	apiv1.Get(urlsPath+"/{id}/history", r.urlsHistoryGet)

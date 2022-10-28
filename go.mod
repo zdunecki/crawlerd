@@ -6,7 +6,6 @@ require (
 	github.com/allegro/bigcache/v2 v2.2.5 // indirect
 	github.com/allegro/bigcache/v3 v3.0.0
 	github.com/andybalholm/brotli v1.0.3
-	github.com/aws/aws-lambda-go v1.25.0
 	github.com/aws/aws-sdk-go v1.40.11
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/chromedp/cdproto v0.0.0-20210526005521-9e51b9051fd0
@@ -18,7 +17,6 @@ require (
 	github.com/json-iterator/go v1.1.10
 	github.com/nats-io/nats-server/v2 v2.2.3
 	github.com/nats-io/nats.go v1.11.0
-	github.com/olivere/elastic/v7 v7.0.27 // indirect
 	github.com/orlangure/gnomock v0.15.0
 	github.com/segmentio/kafka-go v0.4.16
 	github.com/sirupsen/logrus v1.8.1

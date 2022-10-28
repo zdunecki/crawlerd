@@ -1,5 +1,7 @@
 package objects
 
+import "crawlerd/pkg/meta/metav1"
+
 // TODO: use struct from meta pkg
 type RequestPostURL struct {
 	URL string `json:"url"`
@@ -12,4 +14,8 @@ type RequestPatchURL struct {
 
 	// Deprecated: Interval is not important now
 	Interval *int `json:"interval" bson:"interval,omitempty"`
+}
+
+type RequestAppendSeed struct {
+	Seed []*metav1.Seed `json:"seed"`
 }

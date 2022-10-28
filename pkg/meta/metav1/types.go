@@ -263,3 +263,7 @@ type CrawlURL struct {
 	Interval int64  `json:"interval"`
 	WorkerID string `json:"worker_id"`
 }
+
+type Seed struct {
+	URL string `json:"url" bson:"url"`
+}

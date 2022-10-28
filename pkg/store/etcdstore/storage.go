@@ -52,3 +52,7 @@ func (e etcd) Linker() store.Linker {
 func (e etcd) Job() store.Job {
 	return nil
 }
+
+func (e etcd) Seed() store.Seed {
+	return nil
+}

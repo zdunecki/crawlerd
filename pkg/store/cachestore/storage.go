@@ -52,3 +52,7 @@ func (c *cachestorage) Linker() store.Linker {
 func (c *cachestorage) Job() store.Job {
 	return nil
 }
+
+func (c *cachestorage) Seed() store.Seed {
+	return nil
+}

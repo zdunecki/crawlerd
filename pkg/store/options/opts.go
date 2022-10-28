@@ -18,6 +18,7 @@ type repositoryOpt struct {
 	linker          store.Linker
 	runner          store.Runner
 	runnerFunctions store.RunnerFunctions
+	seed            store.Seed
 }
 
 type RepositoryOption struct {
@@ -62,6 +63,9 @@ func WithStorage(opts ...*RepositoryOption) (store.Repository, error) {
 		}
 		if o.repository.runnerFunctions != nil {
 			s.runnerFunctions = o.repository.runnerFunctions
+		}
+		if o.repository.runnerFunctions != nil {
+			s.seed = o.repository.seed
 		}
 	}
 
@@ -170,6 +174,10 @@ func (s *repositoryOpt) Job() store.Job {
 	return s.job
 }
 
+func (s *repositoryOpt) Seed() store.Seed {
+	return s.seed
+}
+
 func (o *RepositoryOption) RequestQueue() *RepositoryOption {
 	o.repository.requestQueue = o.storage.RequestQueue()
 	return o
@@ -202,6 +210,11 @@ func (o *RepositoryOption) Runner() *RepositoryOption {
 
 func (o *RepositoryOption) RunnerFunctions() *RepositoryOption {
 	o.repository.runnerFunctions = o.storage.RunnerFunctions()
+	return o
+}
+
+func (o *RepositoryOption) Seed() *RepositoryOption {
+	o.repository.seed = o.storage.Seed()
 	return o
 }
 

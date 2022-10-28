@@ -7,7 +7,7 @@ RUN apk add --no-cache build-base
 WORKDIR /app
 COPY . .
 
-RUN go build -o ./bin/api main.go
+RUN go build -o ./bin/api cmd/api/main.go
 RUN go build -o ./bin/scheduler cmd/scheduler/main.go
 RUN go build -o ./bin/worker cmd/worker/main.go
 

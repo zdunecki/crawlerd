@@ -11,3 +11,7 @@ type (
 type ResponseRequestQueueCreate struct {
 	IDs []string `json:"ids"`
 }
+
+type ResponseAppendSeed struct {
+	OK bool `json:"ok"`
+}

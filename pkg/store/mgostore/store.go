@@ -113,3 +113,7 @@ func (m *mgo) Runner() store.Runner {
 func (m *mgo) RunnerFunctions() store.RunnerFunctions {
 	return m.runnerFunctionRepo
 }
+
+func (m *mgo) Seed() store.Seed {
+	return nil // TODO:
+}

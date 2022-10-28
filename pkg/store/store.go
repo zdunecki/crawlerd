@@ -93,6 +93,14 @@ type RunnerFunctions interface {
 	Functions
 }
 
+type Seed interface {
+	List(context.Context) ([]*metav1.Seed, error)
+
+	Append(context.Context, []*metav1.Seed) error
+
+	DeleteMany(context.Context, ...string) ([]error, error)
+}
+
 // TODO: different name than Repository?
 type Repository interface {
 	RequestQueue() RequestQueue
@@ -103,4 +111,5 @@ type Repository interface {
 	Job() Job
 	Runner() Runner
 	RunnerFunctions() RunnerFunctions
+	Seed() Seed
 }
