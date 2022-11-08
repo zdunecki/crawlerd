@@ -35,7 +35,8 @@ type (
 	CrawlerStopCB func(chan *metav1.RequestQueue)
 )
 
-type Crawler interface {
+// TODO: CrawlerV1 will be probably deprecated
+type CrawlerV1 interface {
 	Enqueue(metav1.CrawlURL)
 	Update(metav1.CrawlURL)
 	Dequeue(int64)
@@ -48,7 +49,7 @@ type Crawler interface {
 	httpRequest(string) (*http.Response, error)
 }
 
-type crawler struct {
+type crawlerV1 struct {
 	mu     sync.RWMutex
 	wgStop *sync.WaitGroup
 
@@ -71,8 +72,8 @@ type crawler struct {
 	log *log.Entry
 }
 
-func NewCrawler(history store.History, requestQueue store.RequestQueue, worker Worker, pubsub pubsub.PubSub, compressor Compressor, httpClient *http.Client) Crawler {
-	c := &crawler{
+func NewCrawler(history store.History, requestQueue store.RequestQueue, worker Worker, pubsub pubsub.PubSub, compressor Compressor, httpClient *http.Client) CrawlerV1 {
+	c := &crawlerV1{
 		wgStop: &sync.WaitGroup{},
 
 		httpClient: httpClient,
@@ -104,7 +105,7 @@ func NewCrawler(history store.History, requestQueue store.RequestQueue, worker W
 	return c
 }
 
-func (c *crawler) Dequeue(id int64) {
+func (c *crawlerV1) Dequeue(id int64) {
 	if _, err := c.requestQueue.DeleteOneByID(context.Background(), fmt.Sprintf("%d", id)); err != nil {
 		c.log.Error(err)
 	}
@@ -113,7 +114,7 @@ func (c *crawler) Dequeue(id int64) {
 	//}
 }
 
-func (c *crawler) Update(crawlURL metav1.CrawlURL) {
+func (c *crawlerV1) Update(crawlURL metav1.CrawlURL) {
 	if _, err := c.requestQueue.InsertMany(context.Background(), []*metav1.RequestQueueCreate{
 		{
 			RunID:  fmt.Sprintf("%d", crawlURL.Id),
@@ -130,7 +131,7 @@ func (c *crawler) Update(crawlURL metav1.CrawlURL) {
 	//}
 }
 
-func (c *crawler) Enqueue(url metav1.CrawlURL) {
+func (c *crawlerV1) Enqueue(url metav1.CrawlURL) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -172,7 +173,7 @@ func (c *crawler) Enqueue(url metav1.CrawlURL) {
 	c.newIntervalQue(crawlURL)
 }
 
-func (c *crawler) Stop(cb CrawlerStopCB) {
+func (c *crawlerV1) Stop(cb CrawlerStopCB) {
 	if c.queueC == nil || len(c.queueC) == 0 {
 		return
 	}
@@ -188,7 +189,7 @@ func (c *crawler) Stop(cb CrawlerStopCB) {
 	cb(c.closeQueueC)
 }
 
-func (c *crawler) newIntervalQue(crawlURL *metav1.RequestQueue) {
+func (c *crawlerV1) newIntervalQue(crawlURL *metav1.RequestQueue) {
 	//intervalID := QueueInterval(crawlURL.Interval)
 	intervalID := QueueInterval(0)
 
@@ -231,7 +232,7 @@ func (c *crawler) newIntervalQue(crawlURL *metav1.RequestQueue) {
 	}(crawlURL)
 }
 
-func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
+func (c *crawlerV1) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 	for {
 		select {
 		case <-c.stopC[intervalID]:
@@ -338,7 +339,7 @@ func (c *crawler) crawl(ticker *time.Ticker, intervalID QueueInterval) {
 }
 
 // TODO: gridfs vs ioutil.ReadAll
-func (c *crawler) fetchContent(crawl *metav1.RequestQueue) error {
+func (c *crawlerV1) fetchContent(crawl *metav1.RequestQueue) error {
 	c.log.Debug("trying fetch content")
 
 	start := time.Now()
@@ -411,7 +412,7 @@ func (c *crawler) fetchContent(crawl *metav1.RequestQueue) error {
 	return createHistory(body, time.Now())
 }
 
-func (c *crawler) httpRequest(endpoint string) (*http.Response, error) {
+func (c *crawlerV1) httpRequest(endpoint string) (*http.Response, error) {
 	_, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, err

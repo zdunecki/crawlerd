@@ -35,7 +35,7 @@ type worker struct {
 
 	httpClient *http.Client
 	storage    store.Repository
-	crawler    Crawler
+	crawler    CrawlerV1
 	ctrl       Controller
 	pubsub     pubsub.PubSub
 	compressor Compressor
