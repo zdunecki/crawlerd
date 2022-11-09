@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	ScrollDefault = 50
+// ScrollDefault = 50
 )
 
 type urlrepo struct {

@@ -3,10 +3,11 @@ package worker
 import (
 	"errors"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	log "github.com/sirupsen/logrus"
-	"io"
 	"net/http"
 	urllib "net/url"
+	"time"
 )
 
 // TODO: robots.txt, seed, sitemap (sitemap.xml, sitemap_index.xml, feed.atom)
@@ -15,6 +16,14 @@ var siteMapRoots = map[string]bool{
 	"sitemap.xml":       true,
 	"sitemap_index.xml": true,
 	"feed.atom":         true,
+}
+
+type CrawlerV2HttpError struct {
+	*http.Response
+}
+
+func (err *CrawlerV2HttpError) Error() string {
+	return fmt.Sprintf("status_code:%d", err.StatusCode)
 }
 
 type CrawlerV2Error struct {
@@ -38,57 +47,79 @@ type CrawlerV2 struct {
 }
 
 func NewCrawlerV2() *CrawlerV2 {
-	return &CrawlerV2{}
+	return &CrawlerV2{
+		http: &http.Client{
+			Timeout: time.Minute,
+		},
+		log: log.WithField("component", "crawlerv2"),
+	}
 }
 
 func (c *CrawlerV2) Crawl(spec *CrawlerV2CrawlSpec) {
-	fetcher := func() {
-
-	}
-
 	for _, seed := range spec.Seeds {
-		resp, err := c.fetch(seed)
-		if err != nil {
-			if resp != nil {
-				c.log.Error(resp)
-			}
-
-			c.log.Error(err)
-
-			continue
-		}
-
-		if err := c.parseBody(spec.Extracter, resp.Body); err != nil {
-			c.log.Error(err)
-
-			continue
-		}
-
-		for root, ok := range siteMapRoots {
-			if !ok {
-				continue
-			}
-
-			sitemapRoot, err := urllib.JoinPath(seed, root)
-			if err != nil {
+		switch t := spec.Extracter.(type) {
+		case *ExtracterBlog:
+			if _, err := c.bodyParser(seed, t); err != nil {
 				c.log.Error(err)
 				continue
 			}
-			
-			fmt.Println(sitemapRoot)
 
+			if err := c.siteMapSearchCrawler(t, seed); err != nil {
+				c.log.Error(err)
+				continue
+			}
 		}
-
 	}
 }
 
-// TODO: pipe from goquery to extracter
-func (c *CrawlerV2) parseBody(extracter ExtracterAPI, body io.Reader) error {
-	if extracter == nil {
-		return nil
+func (c *CrawlerV2) siteMapSearchCrawler(extracter *ExtracterBlog, url string) error {
+	var errors error
+
+	for sitemap, ok := range siteMapRoots {
+		if !ok {
+			continue
+		}
+
+		sitemapURL, err := urllib.JoinPath(url, sitemap)
+		if err != nil {
+			multierror.Append(errors, err)
+			continue
+		}
+
+		sitemapIndex, err := c.bodyParser(sitemapURL, &ExtracterBlogSitemap{
+			Blog: extracter,
+		})
+		if err != nil {
+			multierror.Append(errors, err)
+			continue
+		}
+
+		switch t := sitemapIndex.(type) {
+		case *ExtracterBlogSitemapResponse:
+			for _, link := range t.Links {
+				if _, err := c.bodyParser(link, extracter); err != nil {
+					c.log.Error(err)
+					continue
+				}
+			}
+		}
 	}
 
-	return extracter.Extract(body) // TODO: for client-side extract get stream of new content
+	return errors
+}
+
+// TODO: pipe from goquery to extracter
+func (c *CrawlerV2) bodyParser(url string, extracter ExtracterAPI) (interface{}, error) {
+	resp, err := c.fetch(url)
+	if err != nil {
+		return nil, err
+	}
+
+	if extracter == nil {
+		return nil, nil
+	}
+
+	return extracter.Extract(resp.Body) // TODO: for client-side extract get stream of new content
 }
 
 func (c *CrawlerV2) fetch(url string) (*http.Response, error) {
@@ -105,9 +136,9 @@ func (c *CrawlerV2) fetch(url string) (*http.Response, error) {
 	// TODO: handle 3xx
 
 	if head.StatusCode >= http.StatusBadRequest {
-		return head, &CrawlerV2Error{
+		return nil, multierror.Append(nil, &CrawlerV2Error{
 			err: ErrCrawlerV2InvalidHTTPStatus,
-		}
+		}, &CrawlerV2HttpError{head})
 	}
 
 	req, err := http.NewRequest("GET", url, nil)

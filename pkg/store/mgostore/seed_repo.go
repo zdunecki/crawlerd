@@ -79,7 +79,7 @@ func (u *seedrepo) Append(ctx context.Context, seed []*metav1.Seed) error {
 	//return true, seq, nil
 }
 
-func (u *seedrepo) DeleteMany(ctx context.Context, ids ...string) (bool, error) {
+func (u *seedrepo) DeleteMany(context.Context, ...string) ([]error, error) {
 	return nil, nil
 	//result, err := u.coll.DeleteOne(
 	//	ctx,

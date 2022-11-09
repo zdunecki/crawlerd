@@ -18,6 +18,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.2.3
 	github.com/nats-io/nats.go v1.11.0
 	github.com/orlangure/gnomock v0.15.0
+	github.com/oxffaa/gopher-parse-sitemap v0.0.0-20191021113419-005d2eb1def4
 	github.com/segmentio/kafka-go v0.4.16
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.0.0
