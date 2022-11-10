@@ -2,32 +2,42 @@ package worker
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/oxffaa/gopher-parse-sitemap"
 	"io"
 	"net/http"
 )
 
-type ExtracterAPI interface {
-	Extract(io.Reader) (interface{}, error)
+type ExtracterAPIResponses interface {
+	*ExtracterBlogSitemapResponse | *ExtracterBlogResponse
+}
+
+type ExtracterAPI[R ExtracterAPIResponses] interface {
+	Extract(io.Reader) (R, error)
 }
 
 // blog sitemap extracter
 type ExtracterBlogSitemapResponse struct {
+	Error error
 	Links []string // TODO: links stream / cursor
 }
 
-type ExtracterBlogSitemap struct {
-	Blog *ExtracterBlog
+func NewExtracterBlogSitemap() ExtracterAPI[*ExtracterBlogSitemapResponse] {
+	return &ExtracterBlogSitemap{}
 }
 
-func (ebs *ExtracterBlogSitemap) Extract(reader io.Reader) (interface{}, error) {
+type ExtracterBlogSitemap struct {
+}
+
+// TODO: streaming
+func (ebs *ExtracterBlogSitemap) Extract(reader io.Reader) (*ExtracterBlogSitemapResponse, error) {
 	// TODO: use Parse and ParseIndex because it's separate method in this lib - find better solution
 
 	var buf bytes.Buffer
 	tee := io.TeeReader(reader, &buf)
 
 	hasIndex := false
+
+	links := make([]string, 0)
 
 	if err := sitemap.ParseIndex(tee, func(entry sitemap.IndexEntry) error {
 		hasIndex = true
@@ -38,33 +48,53 @@ func (ebs *ExtracterBlogSitemap) Extract(reader io.Reader) (interface{}, error) 
 		}
 
 		sitemap.Parse(resp.Body, func(entry sitemap.Entry) error {
-			fmt.Println(entry.GetLocation(), "each")
+			links = append(links, entry.GetLocation())
 			return nil
 		})
 
-		fmt.Println(entry.GetLocation(), "index")
 		return nil
 	}); err != nil {
-		return nil, err
+		return &ExtracterBlogSitemapResponse{
+			Error: err,
+		}, err
 	}
 
 	if !hasIndex {
 		if err := sitemap.Parse(bytes.NewReader(buf.Bytes()), func(entry sitemap.Entry) error {
-			fmt.Println(entry.GetLocation(), "each2")
+			links = append(links, entry.GetLocation())
 			return nil
 		}); err != nil {
-			return nil, err
+			return &ExtracterBlogSitemapResponse{
+				Error: err,
+			}, err
 		}
 	}
 
-	return &ExtracterBlogSitemapResponse{}, nil
+	return &ExtracterBlogSitemapResponse{
+		Links: links,
+	}, nil
 }
 
 // blog extracter
-type ExtracterBlog struct {
-	Category string
+type ExtracterBlogSpec struct {
+	IgnoreSiteMap bool
 }
 
-func (eb *ExtracterBlog) Extract(reader io.Reader) (interface{}, error) {
-	return &ExtracterBlogSitemapResponse{}, nil
+type ExtracterBlogResponse struct {
+	Error error
+}
+
+// TODO: options like regexp etc.
+func NewExtracterBlog(spec *ExtracterBlogSpec) ExtracterAPI[*ExtracterBlogResponse] {
+	return &ExtracterBlog{
+		spec: spec,
+	}
+}
+
+type ExtracterBlog struct {
+	spec *ExtracterBlogSpec
+}
+
+func (eb *ExtracterBlog) Extract(reader io.Reader) (*ExtracterBlogResponse, error) {
+	return &ExtracterBlogResponse{}, nil
 }

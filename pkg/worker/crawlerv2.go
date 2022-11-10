@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	urllib "net/url"
+	"reflect"
 	"time"
 )
 
@@ -36,9 +37,9 @@ func (err *CrawlerV2Error) Error() string {
 
 var ErrCrawlerV2InvalidHTTPStatus = errors.New("invalid http status")
 
-type CrawlerV2CrawlSpec struct {
+type CrawlerV2CrawlSpec[R ExtracterAPIResponses] struct {
 	Seeds     []string
-	Extracter ExtracterAPI
+	Extracter ExtracterAPI[R]
 }
 
 type CrawlerV2 struct {
@@ -55,24 +56,31 @@ func NewCrawlerV2() *CrawlerV2 {
 	}
 }
 
-func (c *CrawlerV2) Crawl(spec *CrawlerV2CrawlSpec) {
-	for _, seed := range spec.Seeds {
-		switch t := spec.Extracter.(type) {
-		case *ExtracterBlog:
-			if _, err := c.bodyParser(seed, t); err != nil {
-				c.log.Error(err)
-				continue
-			}
+func (c *CrawlerV2) CrawlBlog(spec *CrawlerV2CrawlSpec[*ExtracterBlogResponse]) (<-chan *ExtracterBlogResponse, error) {
+	resp := make(chan *ExtracterBlogResponse, 10) // TODO: config
 
-			if err := c.siteMapSearchCrawler(t, seed); err != nil {
-				c.log.Error(err)
-				continue
-			}
-		}
-	}
+	go func() {
+		crawl[*ExtracterBlogResponse](c, spec, resp)
+	}()
+
+	return resp, nil
 }
 
-func (c *CrawlerV2) siteMapSearchCrawler(extracter *ExtracterBlog, url string) error {
+func (c *CrawlerV2) CrawlBlogSitemap(spec *CrawlerV2CrawlSpec[*ExtracterBlogSitemapResponse]) (<-chan *ExtracterBlogSitemapResponse, error) {
+	resp := make(chan *ExtracterBlogSitemapResponse, 10) // TODO: config
+
+	go func() {
+		crawl[*ExtracterBlogSitemapResponse](c, spec, resp)
+	}()
+
+	return resp, nil
+}
+
+func (c *CrawlerV2) crawlThroughSiteMap(
+	url string,
+	extracter ExtracterAPI[*ExtracterBlogSitemapResponse],
+	blogSpec *ExtracterBlogSpec,
+) error {
 	var errors error
 
 	for sitemap, ok := range siteMapRoots {
@@ -86,40 +94,22 @@ func (c *CrawlerV2) siteMapSearchCrawler(extracter *ExtracterBlog, url string) e
 			continue
 		}
 
-		sitemapIndex, err := c.bodyParser(sitemapURL, &ExtracterBlogSitemap{
-			Blog: extracter,
-		})
+		sitemapIndex, err := bodyParser(c, sitemapURL, extracter)
 		if err != nil {
 			multierror.Append(errors, err)
 			continue
 		}
 
-		switch t := sitemapIndex.(type) {
-		case *ExtracterBlogSitemapResponse:
-			for _, link := range t.Links {
-				if _, err := c.bodyParser(link, extracter); err != nil {
-					c.log.Error(err)
-					continue
-				}
+		for _, link := range sitemapIndex.Links {
+			// TODO: queue
+			if _, err := bodyParser(c, link, NewExtracterBlog(blogSpec)); err != nil {
+				c.log.Error(err)
+				continue
 			}
 		}
 	}
 
 	return errors
-}
-
-// TODO: pipe from goquery to extracter
-func (c *CrawlerV2) bodyParser(url string, extracter ExtracterAPI) (interface{}, error) {
-	resp, err := c.fetch(url)
-	if err != nil {
-		return nil, err
-	}
-
-	if extracter == nil {
-		return nil, nil
-	}
-
-	return extracter.Extract(resp.Body) // TODO: for client-side extract get stream of new content
 }
 
 func (c *CrawlerV2) fetch(url string) (*http.Response, error) {
@@ -147,4 +137,56 @@ func (c *CrawlerV2) fetch(url string) (*http.Response, error) {
 	}
 
 	return c.http.Do(req)
+}
+
+func crawl[R ExtracterAPIResponses](c *CrawlerV2, spec *CrawlerV2CrawlSpec[R], data chan<- R) {
+	for _, seed := range spec.Seeds {
+		switch extracter := spec.Extracter.(type) {
+		case ExtracterAPI[*ExtracterBlogResponse]:
+			resp, err := bodyParser[R](c, seed, spec.Extracter)
+			if err != nil {
+				c.log.Error(err)
+				data <- resp
+				continue
+			}
+			data <- resp
+
+			switch blog := extracter.(type) {
+			case *ExtracterBlog:
+				if blog.spec.IgnoreSiteMap {
+					continue
+				}
+
+				if err := c.crawlThroughSiteMap(seed, NewExtracterBlogSitemap(), blog.spec); err != nil {
+					c.log.Error(err)
+					continue
+				}
+			}
+		case ExtracterAPI[*ExtracterBlogSitemapResponse]:
+			resp, err := bodyParser[R](c, seed, spec.Extracter)
+			if err != nil {
+				c.log.Error(err)
+				data <- resp
+				continue
+			}
+
+			data <- resp
+
+			c.log.Error("strategy not implemented yet: ", reflect.TypeOf(extracter))
+		}
+	}
+}
+
+// TODO: pipe from goquery to extracter
+func bodyParser[R ExtracterAPIResponses](c *CrawlerV2, url string, extracter ExtracterAPI[R]) (R, error) {
+	resp, err := c.fetch(url)
+	if err != nil {
+		return nil, err
+	}
+
+	if extracter == nil {
+		return nil, nil
+	}
+
+	return extracter.Extract(resp.Body) // TODO: for client-side extract get stream of new content
 }
