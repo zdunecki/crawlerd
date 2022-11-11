@@ -8,10 +8,10 @@ import (
 )
 
 type server struct {
-	crawler CrawlerV1
+	crawler Crawler
 }
 
-func NewServer(crawler CrawlerV1) crawlerdpb.WorkerServer {
+func NewServer(crawler Crawler) crawlerdpb.WorkerServer {
 	return &server{crawler}
 }
 
