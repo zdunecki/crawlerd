@@ -28,7 +28,7 @@ func TestExtractArticle(t *testing.T) {
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "../../gcp.json")
 	extractor := NewArticle(nil, WithArticleWithGCPClassifier())
 
-	u := "https://blog.allegro.tech/2022/10/probabilistic-algorithms.html"
+	u := "https://blog.allegro.tech/2021/01/impact-of-the-data-model-on-the-MongoDB-database-size.html"
 	resp, err := http.Get(u)
 	if err != nil {
 		t.Fatal(err)
@@ -40,6 +40,6 @@ func TestExtractArticle(t *testing.T) {
 	}
 
 	if data.CategoryRoot != ArticleCategoryEngineering {
-		t.Log("category root should be engineering")
+		t.Fatal("category root should be engineering")
 	}
 }

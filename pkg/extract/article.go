@@ -145,6 +145,7 @@ type Article struct {
 	done    func()
 }
 
+// TODO: cache for crawler and classifier
 func (eb *Article) Extract(reader io.Reader) (*ArticleResponse, error) {
 	crawler := goose.NewCrawler(goose.GetDefaultConfiguration())
 
@@ -178,18 +179,18 @@ func (eb *Article) Extract(reader io.Reader) (*ArticleResponse, error) {
 
 	return &ArticleResponse{
 		Type:         "",
-		Title:        "",
-		URL:          "",
-		Icon:         "",
-		Sitename:     "",
-		Date:         nil,
+		Title:        article.Title,
+		URL:          article.CanonicalLink,
+		Icon:         article.MetaFavicon,
+		Sitename:     article.MetaDescription,
+		Date:         article.PublishDate,
 		Author:       "",
 		Sentiment:    0,
 		Images:       nil,
 		CategoryRoot: categoryRoot,
 		Categories:   articleCategories,
 		Content:      content,
-		Page:         nil,
+		Page:         io.NopCloser(bytes.NewReader([]byte(article.RawHTML))),
 		Tags:         nil,
 		Error:        nil,
 	}, nil
