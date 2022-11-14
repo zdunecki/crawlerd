@@ -5,7 +5,7 @@ import (
 )
 
 type Response interface {
-	*SitemapResponse | *ArticleResponse
+	*SitemapResponse | *ArticleResponse | *SitemapSearcherResponse
 }
 
 type API[R Response] interface {

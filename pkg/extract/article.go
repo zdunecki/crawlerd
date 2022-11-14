@@ -1,7 +1,14 @@
 package extract
 
 import (
+	"bytes"
+	language "cloud.google.com/go/language/apiv1"
+	"cloud.google.com/go/language/apiv1/languagepb"
+	"context"
+	goose "github.com/advancedlogic/GoOse"
+	log "github.com/sirupsen/logrus"
 	"io"
+	"strings"
 	"time"
 )
 
@@ -42,17 +49,148 @@ type ArticleResponse struct {
 	Error        error
 }
 
+type articleOptions struct {
+	classifier func([]byte) ([]*ArticleCategory, error)
+}
+
+const (
+	ArticleCategoryEngineering = "engineering"
+)
+
+func classifierGCP(client *language.Client) func(content []byte) ([]*ArticleCategory, error) {
+	return func(content []byte) ([]*ArticleCategory, error) {
+		classify, err := client.ClassifyText(context.Background(), &languagepb.ClassifyTextRequest{
+			Document: &languagepb.Document{
+				Source: &languagepb.Document_Content{
+					Content: string(content),
+				},
+				Type: languagepb.Document_PLAIN_TEXT,
+			},
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		categories := make([]*ArticleCategory, 0)
+
+		if classify.Categories != nil && len(classify.Categories) > 0 {
+			for _, category := range classify.Categories {
+				id := ""
+				name := ""
+				var score float32 = 0.0
+
+				if strings.Contains(category.Name, "Computers & Electronics") {
+					id = ArticleCategoryEngineering
+					name = "Engineering"
+					score = category.GetConfidence()
+				}
+
+				if id != "" {
+					categories = append(categories, &ArticleCategory{
+						ID:    id,
+						Name:  name,
+						Score: score,
+					})
+				}
+			}
+		}
+
+		return categories, nil
+	}
+}
+
+func WithArticleWithGCPClassifier() func(*articleOptions) func() {
+	ctx := context.Background()
+
+	client, err := language.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+
+	return func(options *articleOptions) func() {
+		options.classifier = classifierGCP(client)
+
+		return func() {
+			client.Close()
+		}
+	}
+}
+
 // TODO: options like regexp etc.
-func NewArticle(spec *ArticleSpec) API[*ArticleResponse] {
+func NewArticle(spec *ArticleSpec, options ...func(options *articleOptions) func()) API[*ArticleResponse] {
+	opt := &articleOptions{}
+
+	doneCallbacks := make([]func(), 0)
+	done := func() {
+		for _, f := range doneCallbacks {
+			f()
+		}
+	}
+
+	for _, o := range options {
+		doneCallbacks = append(doneCallbacks, o(opt))
+	}
+
 	return &Article{
-		Spec: spec,
+		Spec:    spec,
+		options: opt,
+		done:    done,
 	}
 }
 
 type Article struct {
-	Spec *ArticleSpec
+	Spec    *ArticleSpec
+	options *articleOptions
+	done    func()
 }
 
 func (eb *Article) Extract(reader io.Reader) (*ArticleResponse, error) {
-	return &ArticleResponse{}, nil
+	crawler := goose.NewCrawler(goose.GetDefaultConfiguration())
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	article, err := crawler.Crawl(string(data), "")
+	if err != nil {
+		return nil, err
+	}
+
+	categoryRoot := ""
+	articleCategories := make([]*ArticleCategory, 0)
+
+	if eb.options.classifier != nil {
+		categories, err := eb.options.classifier([]byte(article.CleanedText))
+		if err != nil {
+			return nil, err
+		}
+
+		articleCategories = categories
+
+		if len(categories) > 0 {
+			categoryRoot = categories[0].ID
+		}
+	}
+
+	content := io.NopCloser(bytes.NewReader([]byte(article.CleanedText)))
+
+	return &ArticleResponse{
+		Type:         "",
+		Title:        "",
+		URL:          "",
+		Icon:         "",
+		Sitename:     "",
+		Date:         nil,
+		Author:       "",
+		Sentiment:    0,
+		Images:       nil,
+		CategoryRoot: categoryRoot,
+		Categories:   articleCategories,
+		Content:      content,
+		Page:         nil,
+		Tags:         nil,
+		Error:        nil,
+	}, nil
 }
