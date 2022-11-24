@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"crawlerd/pkg/pubsub"
-	"crawlerd/pkg/store/options"
 	"github.com/andybalholm/brotli"
+	"github.com/zdunecki/crawlerd/pkg/pubsub"
+	"github.com/zdunecki/crawlerd/pkg/store/options"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/client-go/kubernetes"
 )

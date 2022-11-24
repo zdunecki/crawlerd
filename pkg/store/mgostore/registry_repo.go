@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

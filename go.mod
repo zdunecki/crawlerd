@@ -1,9 +1,10 @@
-module crawlerd
+module github.com/zdunecki/crawlerd
 
 go 1.19
 
 require (
 	cloud.google.com/go/language v1.8.0
+	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/advancedlogic/GoOse v0.0.0-20210820140952-9d5822d4a625
 	github.com/allegro/bigcache/v3 v3.0.0
 	github.com/andybalholm/brotli v1.0.3
@@ -13,6 +14,7 @@ require (
 	github.com/chromedp/chromedp v0.7.3
 	github.com/evanw/esbuild v0.12.17
 	github.com/go-chi/chi/v5 v5.0.2
+	github.com/go-rod/rod v0.112.0
 	github.com/google/go-cmp v0.5.9
 	github.com/gorilla/schema v1.2.0
 	github.com/hashicorp/go-multierror v1.0.0
@@ -44,7 +46,6 @@ require (
 	cloud.google.com/go/compute/metadata v0.2.1 // indirect
 	cloud.google.com/go/storage v1.27.0 // indirect
 	github.com/Microsoft/go-winio v0.5.0 // indirect
-	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/allegro/bigcache/v2 v2.2.5 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/araddon/dateparse v0.0.0-20180729174819-cfd92a431d0e // indirect
@@ -110,6 +111,9 @@ require (
 	github.com/xdg-go/scram v1.0.2 // indirect
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
+	github.com/ysmood/goob v0.4.0 // indirect
+	github.com/ysmood/gson v0.7.1 // indirect
+	github.com/ysmood/leakless v0.8.0 // indirect
 	go.etcd.io/etcd/pkg/v3 v3.5.0-alpha.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	metav1 "crawlerd/pkg/meta/metav1"
 	jsoniter "github.com/json-iterator/go"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 type httpClient struct {

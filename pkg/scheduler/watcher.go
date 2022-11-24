@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"crawlerd/crawlerdpb"
-	metav1 "crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/store"
-	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/worker"
 )
 
 type (

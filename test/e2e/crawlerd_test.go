@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"crawlerd/api/v1"
-	"crawlerd/pkg/store/etcdstore"
-	"crawlerd/pkg/worker"
+	"github.com/zdunecki/crawlerd/api/v1"
+	"github.com/zdunecki/crawlerd/pkg/store/etcdstore"
+	"github.com/zdunecki/crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 

@@ -3,7 +3,7 @@ package testkit
 import (
 	"context"
 
-	"crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/store"
 )
 
 type GetFn func(context.Context, string) (string, error)

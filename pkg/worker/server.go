@@ -3,8 +3,8 @@ package worker
 import (
 	"context"
 
-	"crawlerd/crawlerdpb"
-	metav1 "crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 type server struct {

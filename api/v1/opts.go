@@ -1,10 +1,10 @@
 package v1
 
 import (
-	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/scheduler"
-	"crawlerd/pkg/store/mgostore"
-	storeOptions "crawlerd/pkg/store/options"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	"github.com/zdunecki/crawlerd/pkg/scheduler"
+	"github.com/zdunecki/crawlerd/pkg/store/mgostore"
+	storeOptions "github.com/zdunecki/crawlerd/pkg/store/options"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 )

@@ -1,8 +1,8 @@
 package v1
 
 import (
-	"crawlerd/api/v1/objects"
-	metav1 "crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/api/v1/objects"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 type URL interface {

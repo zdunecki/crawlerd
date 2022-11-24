@@ -6,15 +6,15 @@ import (
 	"net/http"
 	"strings"
 
-	"crawlerd/api"
-	apiv1 "crawlerd/api/v1"
-	"crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/store"
-	"crawlerd/pkg/util"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 	"github.com/go-chi/chi/v5"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/api"
+	apiv1 "github.com/zdunecki/crawlerd/api/v1"
+	"github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/util"
 )
 
 type v1 struct {

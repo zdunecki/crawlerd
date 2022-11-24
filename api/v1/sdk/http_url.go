@@ -3,8 +3,8 @@ package sdk
 import (
 	"fmt"
 
-	v1 "crawlerd/api/v1"
-	metav1 "crawlerd/pkg/meta/metav1"
+	v1 "github.com/zdunecki/crawlerd/api/v1"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 // TODO: delete all

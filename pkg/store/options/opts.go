@@ -1,10 +1,10 @@
 package options
 
 import (
-	"crawlerd/pkg/store"
-	"crawlerd/pkg/store/cachestore"
-	"crawlerd/pkg/store/etcdstore"
-	"crawlerd/pkg/store/mgostore"
+	"github.com/zdunecki/crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/store/cachestore"
+	"github.com/zdunecki/crawlerd/pkg/store/etcdstore"
+	"github.com/zdunecki/crawlerd/pkg/store/mgostore"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )

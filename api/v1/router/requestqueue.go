@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"regexp"
 
-	"crawlerd/api"
-	"crawlerd/api/v1/objects"
-	"crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/api"
+	"github.com/zdunecki/crawlerd/api/v1/objects"
+	"github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 // TODO urls are now queues

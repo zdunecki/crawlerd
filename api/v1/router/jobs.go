@@ -3,9 +3,9 @@ package router
 import (
 	"context"
 
-	"crawlerd/api"
-	"crawlerd/api/v1/objects"
-	metav1 "crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/api"
+	"github.com/zdunecki/crawlerd/api/v1/objects"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 func (r *router) jobsGetAll(c api.Context) {

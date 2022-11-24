@@ -5,10 +5,10 @@ import (
 	"errors"
 	"path"
 
-	"crawlerd/pkg/store"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	"gocloud.dev/blob/s3blob"
 )
 

@@ -1,9 +1,9 @@
 package crawler
 
 import (
-	"crawlerd/pkg/extract"
 	"github.com/hashicorp/go-multierror"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/pkg/extract"
 	"net/http"
 	urllib "net/url"
 	"reflect"

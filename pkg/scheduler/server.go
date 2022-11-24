@@ -3,8 +3,8 @@ package scheduler
 import (
 	"context"
 
-	"crawlerd/crawlerdpb"
-	scheduler "crawlerd/pkg/core/scheduler"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	scheduler "github.com/zdunecki/crawlerd/pkg/core/scheduler"
 )
 
 type Server interface {

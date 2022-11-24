@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	metav1 "crawlerd/pkg/meta/metav1"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 // TODO: aliases - needed for multi-tenant in same collection

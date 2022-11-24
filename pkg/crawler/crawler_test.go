@@ -1,7 +1,7 @@
 package crawler
 
 import (
-	"crawlerd/pkg/extract"
+	"github.com/zdunecki/crawlerd/pkg/extract"
 	"testing"
 )
 

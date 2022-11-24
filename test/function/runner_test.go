@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	metav1 "crawlerd/pkg/meta/metav1"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 // TODO: esbuild tests

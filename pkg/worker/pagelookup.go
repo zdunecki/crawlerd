@@ -3,7 +3,7 @@ package worker
 import (
 	"net/http"
 
-	"crawlerd/pkg/util"
+	"github.com/zdunecki/crawlerd/pkg/util"
 )
 
 type PageStatus string

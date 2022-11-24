@@ -4,11 +4,11 @@ import (
 	"context"
 	"sync"
 
-	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/core/scheduler"
-	metav1 "crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/store"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	"github.com/zdunecki/crawlerd/pkg/core/scheduler"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/store"
 )
 
 type Controller interface {

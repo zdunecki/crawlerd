@@ -6,15 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	"crawlerd/api"
-	"crawlerd/api/v1"
-	"crawlerd/api/v1/sdk"
-	"crawlerd/pkg/runner/api/runnerv1"
-	"crawlerd/pkg/store"
-	storeOptions "crawlerd/pkg/store/options"
 	"github.com/go-chi/chi/v5"
 	"github.com/orlangure/gnomock"
 	mongopreset "github.com/orlangure/gnomock/preset/mongo"
+	"github.com/zdunecki/crawlerd/api"
+	"github.com/zdunecki/crawlerd/api/v1"
+	"github.com/zdunecki/crawlerd/api/v1/sdk"
+	"github.com/zdunecki/crawlerd/pkg/runner/api/runnerv1"
+	"github.com/zdunecki/crawlerd/pkg/store"
+	storeOptions "github.com/zdunecki/crawlerd/pkg/store/options"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 

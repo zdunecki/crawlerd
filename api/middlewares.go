@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"crawlerd/pkg/util"
+	"github.com/zdunecki/crawlerd/pkg/util"
 )
 
 type MiddleWare func(w http.ResponseWriter, r *http.Request)

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"crawlerd/api"
-	"crawlerd/api/v1"
-	"crawlerd/pkg/scheduler"
 	"github.com/go-chi/chi/v5"
+	"github.com/zdunecki/crawlerd/api"
+	"github.com/zdunecki/crawlerd/api/v1"
+	"github.com/zdunecki/crawlerd/pkg/scheduler"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 

@@ -1,6 +1,6 @@
 package objects
 
-import "crawlerd/pkg/meta/metav1"
+import "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 
 // TODO: use struct from meta pkg
 type RequestPostURL struct {

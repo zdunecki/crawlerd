@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
-	"crawlerd/api"
-	"crawlerd/api/v1/objects"
-	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/api"
+	"github.com/zdunecki/crawlerd/api/v1/objects"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	"github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 func (r *router) urlsGetAll(c api.Context) {

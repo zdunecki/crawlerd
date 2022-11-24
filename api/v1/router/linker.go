@@ -1,8 +1,8 @@
 package router
 
 import (
-	"crawlerd/api"
-	metav1 "crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/api"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 func (r *router) linkerGetAll(c api.Context) {

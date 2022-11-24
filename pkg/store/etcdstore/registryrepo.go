@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	fmt "fmt"
 
-	"crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 

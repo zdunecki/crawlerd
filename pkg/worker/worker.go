@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/pubsub"
-	"crawlerd/pkg/store"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	"github.com/zdunecki/crawlerd/pkg/pubsub"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	"google.golang.org/grpc"
 )
 

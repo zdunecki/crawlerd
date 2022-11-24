@@ -3,14 +3,14 @@ package router
 import (
 	"context"
 
-	"crawlerd/api"
-	"crawlerd/api/v1/objects"
-	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/store"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/api"
+	"github.com/zdunecki/crawlerd/api/v1/objects"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	"gocloud.dev/blob"
 	"gocloud.dev/blob/s3blob"
 )

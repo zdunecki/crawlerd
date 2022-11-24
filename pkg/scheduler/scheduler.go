@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/core/scheduler"
-	"crawlerd/pkg/store"
-	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	"github.com/zdunecki/crawlerd/pkg/core/scheduler"
+	"github.com/zdunecki/crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/worker"
 	"google.golang.org/grpc"
 )
 

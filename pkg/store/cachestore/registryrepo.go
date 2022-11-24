@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"crawlerd/internal/cache"
-	"crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/store"
 	"github.com/allegro/bigcache/v3"
+	"github.com/zdunecki/crawlerd/internal/cache"
+	"github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/store"
 )
 
 const minuteTTL = 60
@@ -21,7 +21,7 @@ type registry struct {
 	cache cache.Cache
 }
 
-//TODO: finish, cache implementation from argument
+// TODO: finish, cache implementation from argument
 func NewRegistryRepository() store.Registry {
 	return &registry{
 		cache: cache.NewCache(bigcache.DefaultConfig(0)),

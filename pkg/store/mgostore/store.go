@@ -3,7 +3,7 @@ package mgostore
 import (
 	"context"
 
-	"crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )

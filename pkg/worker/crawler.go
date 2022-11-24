@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"crawlerd/crawlerdpb"
-	metav1 "crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/pubsub"
-	"crawlerd/pkg/store"
-	"crawlerd/pkg/util"
 	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/pubsub"
+	"github.com/zdunecki/crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 

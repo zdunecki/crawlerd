@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"crawlerd/pkg/util"
+	"github.com/zdunecki/crawlerd/pkg/util"
 	k8sv1 "k8s.io/api/core/v1"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"

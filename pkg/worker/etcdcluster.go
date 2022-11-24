@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"crawlerd/pkg/util"
+	"github.com/zdunecki/crawlerd/pkg/util"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

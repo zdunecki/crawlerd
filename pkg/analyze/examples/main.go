@@ -1,9 +1,9 @@
 package main
 
 import (
-	"crawlerd/pkg/analyze"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/zdunecki/crawlerd/pkg/analyze"
 	"golang.org/x/net/html"
 	"net/http"
 	"os"

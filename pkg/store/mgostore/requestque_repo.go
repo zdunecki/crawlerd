@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	metav1 "crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/store"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

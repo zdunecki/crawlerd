@@ -3,7 +3,7 @@ package util
 import (
 	"testing"
 
-	"crawlerd/test"
+	"github.com/zdunecki/crawlerd/test"
 )
 
 // TODO: util should not be in pkg

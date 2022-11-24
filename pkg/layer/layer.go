@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"crawlerd/pkg/worker"
+	"github.com/zdunecki/crawlerd/pkg/worker"
 )
 
 type layer struct {

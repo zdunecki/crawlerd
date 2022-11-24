@@ -3,10 +3,10 @@ package scheduler
 import (
 	"time"
 
-	"crawlerd/pkg/core/scheduler"
-	"crawlerd/pkg/store"
-	"crawlerd/pkg/store/options"
-	"crawlerd/pkg/worker"
+	"github.com/zdunecki/crawlerd/pkg/core/scheduler"
+	"github.com/zdunecki/crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/store/options"
+	"github.com/zdunecki/crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/client-go/kubernetes"
 )

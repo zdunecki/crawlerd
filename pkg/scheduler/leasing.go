@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/core/scheduler"
-	"crawlerd/pkg/utils/roundrobin"
-	"crawlerd/pkg/worker"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	"github.com/zdunecki/crawlerd/pkg/core/scheduler"
+	"github.com/zdunecki/crawlerd/pkg/utils/roundrobin"
+	"github.com/zdunecki/crawlerd/pkg/worker"
 	"google.golang.org/grpc"
 )
 

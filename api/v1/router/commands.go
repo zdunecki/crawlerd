@@ -12,13 +12,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"crawlerd/api"
-	"crawlerd/api/v1/objects"
-	metav1 "crawlerd/pkg/meta/metav1"
-	"crawlerd/pkg/store"
 	esbuild "github.com/evanw/esbuild/pkg/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/zdunecki/crawlerd/api"
+	"github.com/zdunecki/crawlerd/api/v1/objects"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	"gocloud.dev/blob"
 )
 

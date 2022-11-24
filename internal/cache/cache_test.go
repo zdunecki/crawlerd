@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"crawlerd/test"
 	"github.com/allegro/bigcache/v3"
+	"github.com/zdunecki/crawlerd/test"
 )
 
 func TestCacheBeforeExpire(t *testing.T) {

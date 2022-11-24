@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"crawlerd/pkg/scheduler"
-	storageopt "crawlerd/pkg/store/options"
-	"crawlerd/pkg/worker"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/pkg/scheduler"
+	storageopt "github.com/zdunecki/crawlerd/pkg/store/options"
+	"github.com/zdunecki/crawlerd/pkg/worker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"k8s.io/client-go/kubernetes"

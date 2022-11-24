@@ -1,7 +1,7 @@
 package etcdstore
 
 import (
-	"crawlerd/pkg/store"
+	"github.com/zdunecki/crawlerd/pkg/store"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 

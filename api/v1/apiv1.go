@@ -4,13 +4,13 @@ import (
 	"net/http"
 	"time"
 
-	"crawlerd/api"
-	"crawlerd/api/v1/objects"
-	"crawlerd/api/v1/router"
-	"crawlerd/crawlerdpb"
-	"crawlerd/pkg/store"
 	"github.com/cenkalti/backoff/v3"
 	log "github.com/sirupsen/logrus"
+	"github.com/zdunecki/crawlerd/api"
+	"github.com/zdunecki/crawlerd/api/v1/objects"
+	"github.com/zdunecki/crawlerd/api/v1/router"
+	"github.com/zdunecki/crawlerd/crawlerdpb"
+	"github.com/zdunecki/crawlerd/pkg/store"
 )
 
 type v1 struct {

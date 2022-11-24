@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	v1 "crawlerd/api/v1"
-	"crawlerd/api/v1/objects"
 	jsoniter "github.com/json-iterator/go"
+	v1 "github.com/zdunecki/crawlerd/api/v1"
+	"github.com/zdunecki/crawlerd/api/v1/objects"
 )
 
 type rest interface {

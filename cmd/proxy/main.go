@@ -1,7 +1,7 @@
 package main
 
-import "crawlerd/pkg/proxy"
+import "github.com/zdunecki/crawlerd/pkg/proxy"
 
-func main()  {
+func main() {
 	proxy.New("127.0.0.1:9999")
 }

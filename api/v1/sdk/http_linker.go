@@ -1,7 +1,7 @@
 package sdk
 
 import (
-	metav1 "crawlerd/pkg/meta/metav1"
+	metav1 "github.com/zdunecki/crawlerd/pkg/meta/metav1"
 )
 
 type httpLinker struct {

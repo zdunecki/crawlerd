@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	v1 "crawlerd/api/v1"
+	v1 "github.com/zdunecki/crawlerd/api/v1"
 )
 
 func NewWithOpts(opts ...Option) (v1.V1, error) {
